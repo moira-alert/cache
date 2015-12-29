@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	db                      database
+	db                      *dbConnector
 	patterns                *patternStorage
 	cache                   *cacheStorage
 	configFileName          = flag.String("config", "/etc/moira/config.yml", "path config file")

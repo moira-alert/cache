@@ -3,40 +3,18 @@ package main
 import (
 	"bufio"
 	"flag"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/garyburd/redigo/redis"
+	"github.com/gmlexx/redigomock"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
 	"github.com/rcrowley/go-metrics"
 )
-
-type dbMock struct {
-	patterns   map[string]bool
-	metrics    map[string]string
-	retentions map[string]int
-}
-
-var testDb *dbMock
-
-func (db *dbMock) GetPatterns() ([]string, error) {
-	keys := make([]string, 0, len(db.patterns))
-	for k := range db.patterns {
-		keys = append(keys, k)
-	}
-	return keys, nil
-}
-
-func (db *dbMock) SaveMetrics(buffer []*matchedMetric) error {
-	for _, m := range buffer {
-		db.metrics[m.metric] = fmt.Sprintf("%v %v", m.value, m.timestamp)
-		db.retentions[m.metric] = m.retention
-	}
-	return nil
-}
 
 var tcReport = flag.Bool("teamcity", false, "enable TeamCity reporting format")
 
@@ -125,19 +103,26 @@ var _ = Describe("Cache", func() {
 	retentions = 120:7d
 	`
 
-	BeforeSuite(func() {
-		testDb = &dbMock{make(map[string]bool), make(map[string]string), make(map[string]int)}
-		db = testDb
-		for _, pattern := range testPatterns {
-			testDb.patterns[pattern] = true
+	BeforeEach(func() {
+		c := redigomock.NewFakeRedis()
+		db = &dbConnector{
+			pool: &redis.Pool{
+				MaxIdle:     3,
+				IdleTimeout: 240 * time.Second,
+				Dial: func() (redis.Conn, error) {
+					return c, nil
+				},
+			},
 		}
+
+		for _, pattern := range testPatterns {
+			c.Do("SADD", "moira-pattern-list", pattern)
+		}
+		
 		patterns = newPatternStorage()
 		patterns.doRefresh()
 		cache = &cacheStorage{}
 		cache.buildRetentions(bufio.NewScanner(strings.NewReader(testRetentions)))
-	})
-
-	BeforeEach(func() {
 		totalMetricsReceived = metrics.NewRegisteredMeter("received.total", metrics.DefaultRegistry)
 		validMetricsReceived = metrics.NewRegisteredMeter("received.valid", metrics.DefaultRegistry)
 		matchingMetricsReceived = metrics.NewRegisteredMeter("received.matching", metrics.DefaultRegistry)
@@ -216,13 +201,21 @@ func assertMatchedMetrics(matchingMetrics []string) {
 	})
 
 	It("should appear in cache", func() {
+		c := db.pool.Get()
+		defer c.Close()
+
 		for _, metric := range matchingMetrics {
-			_, exists := testDb.metrics[metric]
-			Expect(exists).To(Equal(true))
+			dbKey := getMetricDbKey(metric)
+			count, err := redis.Int(c.Do("ZCOUNT", dbKey, "-inf", "+inf"))
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(count).To(Equal(1))
 		}
 	})
 
 	It("should have correct retention", func() {
+		c := db.pool.Get()
+		defer c.Close()
+
 		for _, metric := range matchingMetrics {
 			retention := 120
 			if strings.HasPrefix(metric, "Simple") {
@@ -230,11 +223,17 @@ func assertMatchedMetrics(matchingMetrics []string) {
 			} else if strings.HasSuffix(metric, "suf") {
 				retention = 1200
 			}
-			Expect(testDb.retentions[metric]).To(Equal(retention))
+			dbKey := getMetricRetentionDbKey(metric)
+			result, err := redis.Int(c.Do("GET", dbKey))
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(result).To(Equal(retention))
 		}
 	})
 
 	It("should have timestamp rounded to nearest retention", func() {
+		c := db.pool.Get()
+		defer c.Close()
+
 		for _, metric := range matchingMetrics {
 			value := "12 1234567920"
 			if strings.HasPrefix(metric, "Simple") {
@@ -242,7 +241,11 @@ func assertMatchedMetrics(matchingMetrics []string) {
 			} else if strings.HasSuffix(metric, "suf") {
 				value = "12 1234568400"
 			}
-			Expect(testDb.metrics[metric]).To(Equal(value))
+			dbKey := getMetricDbKey(metric)
+			values, err := redis.Strings(c.Do("ZRANGE", dbKey, 0, -1))
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(len(values)).To(Equal(1))
+			Expect(values[0]).To(Equal(value))
 		}
 	})
 
@@ -264,11 +267,18 @@ func assertNonMatchedMetrics(nonMatchingMetrics []string) {
 	})
 
 	It("should not appear in cache", func() {
+		c := db.pool.Get()
+		defer c.Close()
+
 		for _, metric := range nonMatchingMetrics {
-			_, exists := testDb.metrics[metric]
-			Expect(exists).To(Equal(false))
-			_, exists = testDb.retentions[metric]
-			Expect(exists).To(Equal(false))
+			metricDbKey := getMetricDbKey(metric)
+			count, err := redis.Int(c.Do("ZCOUNT", metricDbKey, "-inf", "+inf"))
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(count).To(Equal(0))
+			retentionDbKey := getMetricRetentionDbKey(metric)
+			result, err := c.Do("GET", retentionDbKey)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(result).To(BeNil())
 		}
 	})
 

@@ -73,7 +73,7 @@ func (cs *cacheStorage) savePoints(buffer []*matchedMetric) error {
 
 	}
 
-	if err := db.SaveMetrics(buffer); err != nil {
+	if err := db.saveMetrics(buffer); err != nil {
 		return err
 	}
 

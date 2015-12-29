@@ -39,7 +39,7 @@ func (t *patternStorage) refresh() {
 }
 
 func (t *patternStorage) doRefresh() error {
-	patterns, err := db.GetPatterns()
+	patterns, err := db.getPatterns()
 	if err != nil {
 		return err
 	}

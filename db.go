@@ -11,35 +11,30 @@ type dbConnector struct {
 	pool *redis.Pool
 }
 
-type database interface {
-	GetPatterns() ([]string, error)
-	SaveMetrics(buffer []*matchedMetric) error
+func getMetricDbKey(metric string) string{
+	return fmt.Sprintf("moira-metric:%s", metric)
 }
 
-func (connector *dbConnector) GetPatterns() ([]string, error) {
+func getMetricRetentionDbKey(metric string) string{
+	return fmt.Sprintf("moira-metric-retention:%s", metric)
+}
+
+func (connector *dbConnector) getPatterns() ([]string, error) {
 	c := connector.pool.Get()
 	defer c.Close()
 	return redis.Strings(c.Do("SMEMBERS", "moira-pattern-list"))
 }
 
-func (connector *dbConnector) SendEvent(event []byte) error {
-	c := connector.pool.Get()
-	defer c.Close()
-	if _, err := c.Do("PUBLISH", "metric-event", event); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (connector *dbConnector) SaveMetrics(buffer []*matchedMetric) error {
+func (connector *dbConnector) saveMetrics(buffer []*matchedMetric) error {
 
 	c := connector.pool.Get()
 	defer c.Close()
 
 	for _, m := range buffer {
 
-		metricKey := fmt.Sprintf("moira-metric:%s", m.metric)
-		metricRetentionKey := fmt.Sprintf("moira-metric-retention:%s", m.metric)
+		metricKey := getMetricDbKey(m.metric)
+		metricRetentionKey := getMetricRetentionDbKey(m.metric)
+		
 		metricValue := fmt.Sprintf("%v %v", m.value, m.timestamp)
 
 		c.Send("ZADD", metricKey, m.timestamp, metricValue)
