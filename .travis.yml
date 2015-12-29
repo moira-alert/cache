@@ -15,3 +15,10 @@ script:
     - ginkgo -r --randomizeAllSpecs -cover --failOnPending --trace --race
     - gover
     - goveralls -coverprofile=gover.coverprofile -service=travis-ci
+notifications:
+  webhooks:
+    urls:
+      - https://webhooks.gitter.im/e/9992cd0d36a6ba9bb40b
+    on_success: change
+    on_failure: always
+    on_start: never
