@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -40,6 +41,9 @@ var (
 )
 
 func main() {
+
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	flag.Parse()
 	log.SetFlags(log.Lmicroseconds | log.Lshortfile)
 	log.SetPrefix(fmt.Sprintf("pid:%d ", syscall.Getpid()))
