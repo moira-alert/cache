@@ -134,7 +134,7 @@ func readConfig(configFileName *string) error {
 
 func serve(l net.Listener) {
 	ch := make(chan *matchedMetric, 10)
-	go processor(ch)
+	go save(ch)
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -154,23 +154,23 @@ func handleConnection(conn net.Conn, ch chan *matchedMetric) {
 	bufconn := bufio.NewReader(conn)
 
 	for {
-		line, err := bufconn.ReadBytes('\n')
+		line, err := bufconn.ReadString('\n')
 		if err != nil {
 			conn.Close()
 			if err != io.EOF {
-				log.Printf("read failed: %s", err.Error())
+				log.Printf("read failed: %s", err)
 			}
 			break
 		}
 		go func(ch chan *matchedMetric) {
-			if m := processIncomingMetric(string(line)); m != nil {
+			if m := processIncomingMetric(line); m != nil {
 				ch <- m
 			}
 		}(ch)
 	}
 }
 
-func processor(ch chan *matchedMetric) {
+func save(ch chan *matchedMetric) {
 	buffer := make([]*matchedMetric, 0, 10)
 	timeout := time.NewTimer(time.Second)
 	for {
@@ -192,7 +192,7 @@ func processor(ch chan *matchedMetric) {
 		}
 		timer := time.Now()
 		if err := cache.savePoints(buffer); err != nil {
-			log.Printf("failed to save value in cache: %s", err.Error())
+			log.Printf("failed to save value in cache: %s", err)
 		}
 		savingTimer.UpdateSince(timer)
 		buffer = make([]*matchedMetric, 0, 10)
