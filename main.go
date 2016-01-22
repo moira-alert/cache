@@ -168,6 +168,7 @@ func handleConnection(conn net.Conn, ch chan *matchedMetric) {
 
 func processor(ch chan *matchedMetric) {
 	buffer := make([]*matchedMetric, 0, 10)
+	timeout := time.NewTimer(time.Second)
 	for {
 		select {
 		case m, ok := <-ch:
@@ -179,7 +180,7 @@ func processor(ch chan *matchedMetric) {
 				continue
 			}
 			break
-		case <-time.After(time.Second):
+		case <-timeout.C:
 			break
 		}
 		if len(buffer) == 0 {
