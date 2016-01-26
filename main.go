@@ -10,20 +10,19 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/cyberdelia/go-metrics-graphite"
 	"github.com/gosexy/to"
 	"github.com/gosexy/yaml"
+	"github.com/moira-alert/cache/filter"
 	"github.com/rcrowley/go-metrics"
 	"github.com/rcrowley/goagain"
 )
 
 var (
-	db                      *dbConnector
-	patterns                *patternStorage
-	cache                   *cacheStorage
 	configFileName          = flag.String("config", "/etc/moira/config.yml", "path config file")
 	pidFileName             string
 	logFileName             string
@@ -33,11 +32,9 @@ var (
 	graphitePrefix          string
 	graphiteInterval        int64
 	retentionConfigFileName string
-	totalMetricsReceived    metrics.Meter
-	validMetricsReceived    metrics.Meter
-	matchingMetricsReceived metrics.Meter
-	matchingTimer           metrics.Timer
-	savingTimer             metrics.Timer
+	db                      *filter.DbConnector
+	cache                   *filter.CacheStorage
+	patterns                *filter.PatternStorage
 )
 
 func main() {
@@ -49,40 +46,40 @@ func main() {
 	log.SetPrefix(fmt.Sprintf("pid:%d ", syscall.Getpid()))
 
 	if err := readConfig(configFileName); err != nil {
-		log.Fatalf("error reading config %s: %s", *configFileName, err.Error())
+		log.Fatalf("error reading config %s: %s", *configFileName, err)
 	}
 	logFile, err := os.OpenFile(logFileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
-		log.Fatalf("error opening log file %s: %s", logFileName, err.Error())
+		log.Fatalf("error opening log file %s: %s", logFileName, err)
 	}
 	defer logFile.Close()
 	log.SetOutput(logFile)
 
 	err = ioutil.WriteFile(pidFileName, []byte(fmt.Sprint(syscall.Getpid())), 0644)
 	if err != nil {
-		log.Fatalf("error writing pid file %s: %s", pidFileName, err.Error())
+		log.Fatalf("error writing pid file %s: %s", pidFileName, err)
 	}
 
-	db = newDbConnector(redisURI)
+	retentionConfigFile, err := os.Open(retentionConfigFileName)
+	if err != nil {
+		log.Fatalf("error open retentions file %s: %s", pidFileName, err)
+	}
 
-	patterns = newPatternStorage()
-	cache, err = newCacheStorage()
+	filter.InitGraphiteMetrics()
+
+	db = filter.NewDbConnector(redisURI)
+	patterns = filter.NewPatternStorage()
+	cache, err = filter.NewCacheStorage(retentionConfigFile)
 	if err != nil {
 		log.Fatalf("failed to initialize cache with config %s: %s", retentionConfigFileName, err.Error())
 	}
 
-	go patterns.refresh()
+	go patterns.Refresh(db)
 
 	if graphiteURI != "" {
 		graphiteAddr, _ := net.ResolveTCPAddr("tcp", graphiteURI)
 		go graphite.Graphite(metrics.DefaultRegistry, time.Duration(graphiteInterval)*time.Second, fmt.Sprintf("%s.cache", graphitePrefix), graphiteAddr)
 	}
-
-	totalMetricsReceived = metrics.NewRegisteredMeter("received.total", metrics.DefaultRegistry)
-	validMetricsReceived = metrics.NewRegisteredMeter("received.valid", metrics.DefaultRegistry)
-	matchingMetricsReceived = metrics.NewRegisteredMeter("received.matching", metrics.DefaultRegistry)
-	matchingTimer = metrics.NewRegisteredTimer("time.match", metrics.DefaultRegistry)
-	savingTimer = metrics.NewRegisteredTimer("time.save", metrics.DefaultRegistry)
 
 	l, err := goagain.Listener()
 	if err != nil {
@@ -133,8 +130,23 @@ func readConfig(configFileName *string) error {
 }
 
 func serve(l net.Listener) {
-	ch := make(chan *matchedMetric, 10)
-	go save(ch)
+	var wg sync.WaitGroup
+	ch := make(chan *filter.MatchedMetric, 10)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		cache.Save(ch, func(buffer []*filter.MatchedMetric) {
+			if err := cache.SavePoints(buffer, db); err != nil {
+				log.Printf("failed to save value in cache: %s", err)
+			}
+		})
+	}()
+	go func() {
+		for {
+			filter.UpdateProcessingMetrics()
+			time.Sleep(time.Second)
+		}
+	}()
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -148,9 +160,10 @@ func serve(l net.Listener) {
 		go handleConnection(conn, ch)
 	}
 	close(ch)
+	wg.Wait()
 }
 
-func handleConnection(conn net.Conn, ch chan *matchedMetric) {
+func handleConnection(conn net.Conn, ch chan *filter.MatchedMetric) {
 	bufconn := bufio.NewReader(conn)
 
 	for {
@@ -162,39 +175,10 @@ func handleConnection(conn net.Conn, ch chan *matchedMetric) {
 			}
 			break
 		}
-		go func(ch chan *matchedMetric) {
-			if m := processIncomingMetric(line); m != nil {
+		go func(ch chan *filter.MatchedMetric) {
+			if m := patterns.ProcessIncomingMetric(line); m != nil {
 				ch <- m
 			}
 		}(ch)
-	}
-}
-
-func save(ch chan *matchedMetric) {
-	buffer := make([]*matchedMetric, 0, 10)
-	timeout := time.NewTimer(time.Second)
-	for {
-		select {
-		case m, ok := <-ch:
-			if !ok {
-				return
-			}
-			buffer = append(buffer, m)
-			if len(buffer) < 10 {
-				continue
-			}
-			break
-		case <-timeout.C:
-			break
-		}
-		if len(buffer) == 0 {
-			continue
-		}
-		timer := time.Now()
-		if err := cache.savePoints(buffer); err != nil {
-			log.Printf("failed to save value in cache: %s", err)
-		}
-		savingTimer.UpdateSince(timer)
-		buffer = make([]*matchedMetric, 0, 10)
 	}
 }

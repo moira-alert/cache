@@ -11,8 +11,10 @@ before_install:
   - go get github.com/onsi/ginkgo/ginkgo
   - go get github.com/onsi/gomega
   - go get github.com/modocache/gover
+  - go get github.com/gmlexx/redigomock
+  - cd filter
 script:
-    - ginkgo -r --randomizeAllSpecs -cover --failOnPending --trace --race
+    - cd ../tests && ginkgo -r --randomizeAllSpecs -cover --failOnPending --trace --race
     - gover
     - goveralls -coverprofile=gover.coverprofile -service=travis-ci
 notifications:

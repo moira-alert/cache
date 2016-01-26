@@ -1,4 +1,4 @@
-package main
+package tests
 
 import (
 	"bufio"
@@ -10,13 +10,18 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/gmlexx/redigomock"
+	"github.com/moira-alert/cache/filter"
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
-	"github.com/rcrowley/go-metrics"
 )
 
-var tcReport = flag.Bool("teamcity", false, "enable TeamCity reporting format")
+var (
+	tcReport = flag.Bool("teamcity", false, "enable TeamCity reporting format")
+	db       *filter.DbConnector
+	cache    *filter.CacheStorage
+	patterns    *filter.PatternStorage
+)
 
 func TestCache(t *testing.T) {
 	flag.Parse()
@@ -105,8 +110,8 @@ var _ = Describe("Cache", func() {
 
 	BeforeEach(func() {
 		c := redigomock.NewFakeRedis()
-		db = &dbConnector{
-			pool: &redis.Pool{
+		db = &filter.DbConnector{
+			Pool: &redis.Pool{
 				MaxIdle:     3,
 				IdleTimeout: 240 * time.Second,
 				Dial: func() (redis.Conn, error) {
@@ -114,22 +119,18 @@ var _ = Describe("Cache", func() {
 				},
 			},
 		}
-
 		for _, pattern := range testPatterns {
 			c.Do("SADD", "moira-pattern-list", pattern)
 		}
 		
-		patterns = newPatternStorage()
-		patterns.doRefresh()
-		cache = &cacheStorage{}
-		cache.buildRetentions(bufio.NewScanner(strings.NewReader(testRetentions)))
-		totalMetricsReceived = metrics.NewRegisteredMeter("received.total", metrics.DefaultRegistry)
-		validMetricsReceived = metrics.NewRegisteredMeter("received.valid", metrics.DefaultRegistry)
-		matchingMetricsReceived = metrics.NewRegisteredMeter("received.matching", metrics.DefaultRegistry)
-		matchingTimer = metrics.NewRegisteredTimer("time.match", metrics.DefaultRegistry)
-		savingTimer = metrics.NewRegisteredTimer("time.save", metrics.DefaultRegistry)
-	})
+		filter.InitGraphiteMetrics()
 
+		patterns = filter.NewPatternStorage()
+		patterns.DoRefresh(db)
+		cache = &filter.CacheStorage{}
+		cache.BuildRetentions(bufio.NewScanner(strings.NewReader(testRetentions)))
+	})
+		
 	Context("When invalid metric arrives", func() {
 		BeforeEach(func() {
 			for _, metric := range invalidRawMetrics {
@@ -138,9 +139,10 @@ var _ = Describe("Cache", func() {
 		})
 
 		It("should be properly counted", func() {
-			Expect(int(totalMetricsReceived.Count())).To(Equal(len(invalidRawMetrics)))
-			Expect(int(validMetricsReceived.Count())).To(Equal(0))
-			Expect(int(matchingMetricsReceived.Count())).To(Equal(0))
+			filter.UpdateProcessingMetrics()
+			Expect(int(filter.TotalMetricsReceived.Count())).To(Equal(len(invalidRawMetrics)))
+			Expect(int(filter.ValidMetricsReceived.Count())).To(Equal(0))
+			Expect(int(filter.MatchingMetricsReceived.Count())).To(Equal(0))
 		})
 	})
 
@@ -195,17 +197,18 @@ var _ = Describe("Cache", func() {
 
 func assertMatchedMetrics(matchingMetrics []string) {
 	It("should be properly counted", func() {
-		Expect(int(totalMetricsReceived.Count())).To(Equal(len(matchingMetrics)))
-		Expect(int(validMetricsReceived.Count())).To(Equal(len(matchingMetrics)))
-		Expect(int(matchingMetricsReceived.Count())).To(Equal(len(matchingMetrics)))
+		filter.UpdateProcessingMetrics()
+		Expect(int(filter.TotalMetricsReceived.Count())).To(Equal(len(matchingMetrics)))
+		Expect(int(filter.ValidMetricsReceived.Count())).To(Equal(len(matchingMetrics)))
+		Expect(int(filter.MatchingMetricsReceived.Count())).To(Equal(len(matchingMetrics)))
 	})
 
 	It("should appear in cache", func() {
-		c := db.pool.Get()
+		c := db.Pool.Get()
 		defer c.Close()
 
 		for _, metric := range matchingMetrics {
-			dbKey := getMetricDbKey(metric)
+			dbKey := filter.GetMetricDbKey(metric)
 			count, err := redis.Int(c.Do("ZCOUNT", dbKey, "-inf", "+inf"))
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(count).To(Equal(1))
@@ -213,7 +216,7 @@ func assertMatchedMetrics(matchingMetrics []string) {
 	})
 
 	It("should have correct retention", func() {
-		c := db.pool.Get()
+		c := db.Pool.Get()
 		defer c.Close()
 
 		for _, metric := range matchingMetrics {
@@ -223,7 +226,7 @@ func assertMatchedMetrics(matchingMetrics []string) {
 			} else if strings.HasSuffix(metric, "suf") {
 				retention = 1200
 			}
-			dbKey := getMetricRetentionDbKey(metric)
+			dbKey := filter.GetMetricRetentionDbKey(metric)
 			result, err := redis.Int(c.Do("GET", dbKey))
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(result).To(Equal(retention))
@@ -231,7 +234,7 @@ func assertMatchedMetrics(matchingMetrics []string) {
 	})
 
 	It("should have timestamp rounded to nearest retention", func() {
-		c := db.pool.Get()
+		c := db.Pool.Get()
 		defer c.Close()
 
 		for _, metric := range matchingMetrics {
@@ -241,7 +244,7 @@ func assertMatchedMetrics(matchingMetrics []string) {
 			} else if strings.HasSuffix(metric, "suf") {
 				value = "12 1234568400"
 			}
-			dbKey := getMetricDbKey(metric)
+			dbKey := filter.GetMetricDbKey(metric)
 			values, err := redis.Strings(c.Do("ZRANGE", dbKey, 0, -1))
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(len(values)).To(Equal(1))
@@ -252,30 +255,31 @@ func assertMatchedMetrics(matchingMetrics []string) {
 }
 
 func process(metric string) {
-	if m := processIncomingMetric(metric); m != nil {
-		buffer := []*matchedMetric{m}
-		cache.savePoints(buffer)
+	if m := patterns.ProcessIncomingMetric(metric); m != nil {
+		buffer := []*filter.MatchedMetric{m}
+		cache.SavePoints(buffer, db)
 	}
 }
 
 func assertNonMatchedMetrics(nonMatchingMetrics []string) {
 
 	It("should be properly counted", func() {
-		Expect(int(totalMetricsReceived.Count())).To(Equal(len(nonMatchingMetrics)))
-		Expect(int(validMetricsReceived.Count())).To(Equal(len(nonMatchingMetrics)))
-		Expect(int(matchingMetricsReceived.Count())).To(Equal(0))
+		filter.UpdateProcessingMetrics()
+		Expect(int(filter.TotalMetricsReceived.Count())).To(Equal(len(nonMatchingMetrics)))
+		Expect(int(filter.ValidMetricsReceived.Count())).To(Equal(len(nonMatchingMetrics)))
+		Expect(int(filter.MatchingMetricsReceived.Count())).To(Equal(0))
 	})
 
 	It("should not appear in cache", func() {
-		c := db.pool.Get()
+		c := db.Pool.Get()
 		defer c.Close()
 
 		for _, metric := range nonMatchingMetrics {
-			metricDbKey := getMetricDbKey(metric)
+			metricDbKey := filter.GetMetricDbKey(metric)
 			count, err := redis.Int(c.Do("ZCOUNT", metricDbKey, "-inf", "+inf"))
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(count).To(Equal(0))
-			retentionDbKey := getMetricRetentionDbKey(metric)
+			retentionDbKey := filter.GetMetricRetentionDbKey(metric)
 			result, err := c.Do("GET", retentionDbKey)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(result).To(BeNil())
