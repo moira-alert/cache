@@ -21,7 +21,7 @@ func NewDbConnector(redisURI string) *DbConnector {
 
 // GetMetricDbKey returns string redis key for metric
 func GetMetricDbKey(metric string) string {
-	return fmt.Sprintf("moira-metric:%s", metric)
+	return fmt.Sprintf("moira-metric-data:%s", metric)
 }
 
 // GetMetricRetentionDbKey returns string redis key for metric retention
@@ -45,7 +45,7 @@ func (connector *DbConnector) saveMetrics(buffer []*MatchedMetric) error {
 		metricKey := GetMetricDbKey(m.Metric)
 		metricRetentionKey := GetMetricRetentionDbKey(m.Metric)
 
-		metricValue := fmt.Sprintf("%v %v", m.Value, m.Timestamp)
+		metricValue := fmt.Sprintf("%v %v", m.Timestamp, m.Value)
 
 		c.Send("ZADD", metricKey, m.Timestamp, metricValue)
 		c.Send("SET", metricRetentionKey, m.Retention)

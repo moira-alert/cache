@@ -238,11 +238,11 @@ func assertMatchedMetrics(matchingMetrics []string) {
 		defer c.Close()
 
 		for _, metric := range matchingMetrics {
-			value := "12 1234567920"
+			value := "1234567920 12"
 			if strings.HasPrefix(metric, "Simple") {
-				value = "12 1234567920"
+				value = "1234567920 12"
 			} else if strings.HasSuffix(metric, "suf") {
-				value = "12 1234568400"
+				value = "1234568400 12"
 			}
 			dbKey := filter.GetMetricDbKey(metric)
 			values, err := redis.Strings(c.Do("ZRANGE", dbKey, 0, -1))
