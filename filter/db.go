@@ -2,20 +2,21 @@ package filter
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/garyburd/redigo/redis"
 )
 
 // DbConnector is DB layer client
 type DbConnector struct {
-	Pool *redis.Pool
+	Pool  *redis.Pool
+	cache map[string]*MatchedMetric
 }
 
 // NewDbConnector return db connector
-func NewDbConnector(redisURI string) *DbConnector {
+func NewDbConnector(pool *redis.Pool) *DbConnector {
 	return &DbConnector{
-		Pool: newRedisPool(redisURI),
+		Pool: pool,
+		cache: make(map[string]*MatchedMetric),
 	}
 }
 
@@ -42,6 +43,10 @@ func (connector *DbConnector) saveMetrics(buffer []*MatchedMetric) error {
 
 	for _, m := range buffer {
 
+		if ex, ok := connector.cache[m.Metric]; ok && ex.RetentionTimestamp == m.RetentionTimestamp && ex.Value == m.Value {
+			continue
+		}
+		connector.cache[m.Metric] = m
 		metricKey := GetMetricDbKey(m.Metric)
 		metricRetentionKey := GetMetricRetentionDbKey(m.Metric)
 
@@ -59,25 +64,4 @@ func (connector *DbConnector) saveMetrics(buffer []*MatchedMetric) error {
 		}
 	}
 	return c.Flush()
-}
-
-func newRedisPool(redisURI string, dbID ...int) *redis.Pool {
-	return &redis.Pool{
-		MaxIdle:     10,
-		IdleTimeout: 240 * time.Second,
-		Dial: func() (redis.Conn, error) {
-			c, err := redis.Dial("tcp", redisURI)
-			if err != nil {
-				return nil, err
-			}
-			if len(dbID) > 0 {
-				c.Do("SELECT", dbID[0])
-			}
-			return c, err
-		},
-		TestOnBorrow: func(c redis.Conn, t time.Time) error {
-			_, err := c.Do("PING")
-			return err
-		},
-	}
 }

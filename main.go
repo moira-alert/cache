@@ -20,6 +20,7 @@ import (
 	"github.com/moira-alert/cache/filter"
 	"github.com/rcrowley/go-metrics"
 	"github.com/rcrowley/goagain"
+	"github.com/garyburd/redigo/redis"
 )
 
 var (
@@ -67,7 +68,7 @@ func main() {
 
 	filter.InitGraphiteMetrics()
 
-	db = filter.NewDbConnector(redisURI)
+	db = filter.NewDbConnector(newRedisPool(redisURI))
 	patterns = filter.NewPatternStorage()
 	cache, err = filter.NewCacheStorage(retentionConfigFile)
 	if err != nil {
@@ -180,5 +181,26 @@ func handleConnection(conn net.Conn, ch chan *filter.MatchedMetric) {
 				ch <- m
 			}
 		}(ch)
+	}
+}
+
+func newRedisPool(redisURI string, dbID ...int) *redis.Pool {
+	return &redis.Pool{
+		MaxIdle:     10,
+		IdleTimeout: 240 * time.Second,
+		Dial: func() (redis.Conn, error) {
+			c, err := redis.Dial("tcp", redisURI)
+			if err != nil {
+				return nil, err
+			}
+			if len(dbID) > 0 {
+				c.Do("SELECT", dbID[0])
+			}
+			return c, err
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			return err
+		},
 	}
 }

@@ -110,15 +110,13 @@ var _ = Describe("Cache", func() {
 
 	BeforeEach(func() {
 		c := redigomock.NewFakeRedis()
-		db = &filter.DbConnector{
-			Pool: &redis.Pool{
+		db = filter.NewDbConnector(&redis.Pool{
 				MaxIdle:     3,
 				IdleTimeout: 240 * time.Second,
 				Dial: func() (redis.Conn, error) {
 					return c, nil
 				},
-			},
-		}
+			})
 		for _, pattern := range testPatterns {
 			c.Do("SADD", "moira-pattern-list", pattern)
 		}
