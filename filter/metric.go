@@ -10,16 +10,17 @@ import (
 
 // MatchedMetric represent parsed and matched metric data
 type MatchedMetric struct {
-	Metric    string
-	Patterns  []string
-	Value     float64
-	Timestamp int
-	Retention int
+	Metric             string
+	Patterns           []string
+	Value              float64
+	Timestamp          int64
+	RetentionTimestamp int64
+	Retention          int
 }
 
 var (
-	totalReceived int64
-	validReceived int64
+	totalReceived   int64
+	validReceived   int64
 	matchedReceived int64
 )
 
@@ -62,12 +63,12 @@ func (t *PatternStorage) ProcessIncomingMetric(rawLine string) *MatchedMetric {
 
 	matchingStart := time.Now()
 	matched := t.MatchPattern(metric)
-	if count % 10 == 0 {
+	if count%10 == 0 {
 		MatchingTimer.UpdateSince(matchingStart)
 	}
 	if len(matched) > 0 {
 		atomic.AddInt64(&matchedReceived, 1)
-		return &MatchedMetric{metric, matched, value, int(ts), 60}
+		return &MatchedMetric{metric, matched, value, ts, ts, 60}
 	}
 	return nil
 }

@@ -47,7 +47,7 @@ func (connector *DbConnector) saveMetrics(buffer []*MatchedMetric) error {
 
 		metricValue := fmt.Sprintf("%v %v", m.Timestamp, m.Value)
 
-		c.Send("ZADD", metricKey, m.Timestamp, metricValue)
+		c.Send("ZADD", metricKey, m.RetentionTimestamp, metricValue)
 		c.Send("SET", metricRetentionKey, m.Retention)
 
 		for _, pattern := range m.Patterns {

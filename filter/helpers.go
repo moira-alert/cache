@@ -13,7 +13,7 @@ func split2(s, sep string) (string, string) {
 	return splitResult[0], splitResult[1]
 }
 
-func roundToNearestRetention(ts, retention int) int {
+func roundToNearestRetention(ts, retention int64) int64 {
 	return (ts + retention/2) / retention * retention
 }
 

@@ -99,7 +99,7 @@ func (cs *CacheStorage) SavePoints(buffer []*MatchedMetric, db *DbConnector) err
 				break
 			}
 		}
-		m.Timestamp = roundToNearestRetention(m.Timestamp, m.Retention)
+		m.RetentionTimestamp = roundToNearestRetention(m.Timestamp, int64(m.Retention))
 
 	}
 

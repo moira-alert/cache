@@ -20,7 +20,7 @@ var (
 	tcReport = flag.Bool("teamcity", false, "enable TeamCity reporting format")
 	db       *filter.DbConnector
 	cache    *filter.CacheStorage
-	patterns    *filter.PatternStorage
+	patterns *filter.PatternStorage
 )
 
 func TestCache(t *testing.T) {
@@ -122,7 +122,7 @@ var _ = Describe("Cache", func() {
 		for _, pattern := range testPatterns {
 			c.Do("SADD", "moira-pattern-list", pattern)
 		}
-		
+
 		filter.InitGraphiteMetrics()
 
 		patterns = filter.NewPatternStorage()
@@ -130,7 +130,7 @@ var _ = Describe("Cache", func() {
 		cache = &filter.CacheStorage{}
 		cache.BuildRetentions(bufio.NewScanner(strings.NewReader(testRetentions)))
 	})
-		
+
 	Context("When invalid metric arrives", func() {
 		BeforeEach(func() {
 			for _, metric := range invalidRawMetrics {
@@ -238,17 +238,17 @@ func assertMatchedMetrics(matchingMetrics []string) {
 		defer c.Close()
 
 		for _, metric := range matchingMetrics {
-			value := "1234567920 12"
+			timestamp := "1234567920"
 			if strings.HasPrefix(metric, "Simple") {
-				value = "1234567920 12"
+				timestamp = "1234567920"
 			} else if strings.HasSuffix(metric, "suf") {
-				value = "1234568400 12"
+				timestamp = "1234568400"
 			}
 			dbKey := filter.GetMetricDbKey(metric)
-			values, err := redis.Strings(c.Do("ZRANGE", dbKey, 0, -1))
+			values, err := redis.Strings(c.Do("ZRANGE", dbKey, 0, -1, "WITHSCORES"))
 			Expect(err).ShouldNot(HaveOccurred())
-			Expect(len(values)).To(Equal(1))
-			Expect(values[0]).To(Equal(value))
+			Expect(len(values)).To(Equal(2))
+			Expect(values[1]).To(Equal(timestamp))
 		}
 	})
 
