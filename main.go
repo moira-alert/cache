@@ -168,7 +168,7 @@ func handleConnection(conn net.Conn, ch chan *filter.MatchedMetric) {
 	bufconn := bufio.NewReader(conn)
 
 	for {
-		line, err := bufconn.ReadString('\n')
+		lineBytes, err := bufconn.ReadBytes('\n')
 		if err != nil {
 			conn.Close()
 			if err != io.EOF {
@@ -177,7 +177,7 @@ func handleConnection(conn net.Conn, ch chan *filter.MatchedMetric) {
 			break
 		}
 		go func(ch chan *filter.MatchedMetric) {
-			if m := patterns.ProcessIncomingMetric(line); m != nil {
+			if m := patterns.ProcessIncomingMetric(lineBytes); m != nil {
 				ch <- m
 			}
 		}(ch)

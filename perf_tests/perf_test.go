@@ -105,7 +105,7 @@ var _ = Describe("Cache", func() {
 		Measure("metrics processing", func(b Benchmarker) {
 			runtime := b.Time("runtime", func() {
 				for _, line := range testMetricsLines {
-					patterns.ProcessIncomingMetric(line)
+					patterns.ProcessIncomingMetric([]byte(line))
 				}
 			})
 			Expect(runtime.Seconds()).Should(BeNumerically("<", 1), "metrics processing shouldn't take too long.")

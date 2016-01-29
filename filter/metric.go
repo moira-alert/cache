@@ -3,7 +3,6 @@ package filter
 import (
 	"log"
 	"strconv"
-	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -25,50 +24,64 @@ var (
 )
 
 // ProcessIncomingMetric process "metric value [timestamp]" raw line
-func (t *PatternStorage) ProcessIncomingMetric(rawLine string) *MatchedMetric {
+func (t *PatternStorage) ProcessIncomingMetric(lineBytes []byte) *MatchedMetric {
+
 	count := atomic.AddInt64(&totalReceived, 1)
 
-	elems := strings.Split(strings.TrimSpace(rawLine), " ")
-	if len(elems) != 2 && len(elems) != 3 {
-		// log.Printf("Line [%s] must be of 2 or 3 words. Got %d", rawLine, len(elems))
-		return nil
-	}
-
-	runes := make([]rune, 0, len(elems[0]))
-	for _, r := range elems[0] {
-		if !strconv.IsPrint(r) {
-			continue
+	var parts [3][]byte
+	partIndex := 0
+	partOffset := 0
+	for i, b := range lineBytes {
+		if !strconv.IsPrint(rune(b)) {
+			copy(lineBytes[i:], lineBytes[i + 1:])
+			lineBytes = lineBytes[:len(lineBytes) - 1]
 		}
-		runes = append(runes, r)
+		if b == ' '{
+			parts[partIndex] = lineBytes[partOffset:i]
+			partOffset = i + 1
+			partIndex ++
+		}
+		if partIndex > 2 {
+			return nil
+		}
 	}
-	metric := string(runes)
+	
+	if partIndex == 0{
+		return nil
+	}
+	
+	parts[partIndex] = lineBytes[partOffset:]
 
-	value, err := strconv.ParseFloat(elems[1], 64)
+	metric := parts[0]
+	valueString := string(parts[1])
+
+	value, err := strconv.ParseFloat(valueString, 64)
 	if err != nil {
-		log.Printf("Can not parse value [%s] in line [%s]: %s", elems[1], rawLine, err)
+		log.Printf("Can not parse value [%s] in line [%s]: %s", valueString, string(lineBytes), err)
 		return nil
 	}
 
-	ts := time.Now().Unix()
-	if len(elems) == 3 {
-		tsf, err := strconv.ParseFloat(elems[2], 64)
-		if err != nil || tsf == 0 {
-			log.Printf("Can not parse timestamp [%s] in line [%s]: %s. Use current timestamp", elems[2], rawLine, err)
+	var timestamp int64
+	timestampString := string(parts[2])
+	if partIndex == 2 {
+		parsed, err := strconv.ParseInt(timestampString, 10, 64)
+		if err != nil || parsed == 0 {
+			log.Printf("Can not parse timestamp [%s] in line [%s]: %s. Use current timestamp", timestampString, string(lineBytes), err)
 		} else {
-			ts = int64(tsf)
+			timestamp = parsed
 		}
 	}
 
 	atomic.AddInt64(&validReceived, 1)
 
 	matchingStart := time.Now()
-	matched := t.MatchPattern(metric)
+	matched := t.MatchPattern(string(metric))
 	if count%10 == 0 {
 		MatchingTimer.UpdateSince(matchingStart)
 	}
 	if len(matched) > 0 {
 		atomic.AddInt64(&matchedReceived, 1)
-		return &MatchedMetric{metric, matched, value, ts, ts, 60}
+		return &MatchedMetric{string(metric), matched, value, timestamp, timestamp, 60}
 	}
 	return nil
 }
