@@ -107,47 +107,34 @@ func (t *PatternStorage) buildTree(patterns []string) error {
 }
 
 // MatchPattern returns array of matched patterns
-func (t *PatternStorage) MatchPattern(metric string) []string {
-	var (
-		currentLevel []*PatternNode
-		nextLevel    []*PatternNode
-		matched      []string
-	)
+func (t *PatternStorage) MatchPattern(metric []byte) []string {
+	currentLevel := []*PatternNode{t.PatternTree}
+	found := 0
+	index := 0
+	for i, c := range metric {
+		if c == '.' {
+			part := metric[index:i]
 
-	currentLevel = append(currentLevel, t.PatternTree)
-	parts := strings.Split(metric, ".")
-	for _, part := range parts {
-		if len(currentLevel) == 0 || len(part) == 0 {
-			return matched
-		}
+			if len(part) == 0 {
+				return []string{}
+			}
 
-		hash := xxhash.Checksum32([]byte(part))
-		for _, node := range currentLevel {
-			for _, child := range node.Children {
-				match := false
+			index = i + 1
 
-				if child.Hash == asteriskHash || child.Hash == hash {
-					match = true
-				} else if len(child.InnerParts) > 0 {
-					for _, innerPart := range child.InnerParts {
-						innerMatch, _ := path.Match(innerPart, part)
-						if innerMatch {
-							match = true
-							break
-						}
-					}
-				}
-
-				if match {
-					nextLevel = append(nextLevel, child)
-				}
+			currentLevel, found = findPart(part, currentLevel)
+			if found == 0 {
+				return []string{}
 			}
 		}
-
-		currentLevel = nextLevel
-		nextLevel = make([]*PatternNode, 0, 64)
 	}
 
+	part := metric[index:len(metric)]
+	currentLevel, found = findPart(part, currentLevel)
+	if found == 0 {
+		return []string{}
+	}
+
+	matched := make([]string, 0, found)
 	for _, node := range currentLevel {
 		if len(node.Children) == 0 {
 			matched = append(matched, node.Prefix)
@@ -155,4 +142,31 @@ func (t *PatternStorage) MatchPattern(metric string) []string {
 	}
 
 	return matched
+}
+
+func findPart(part []byte, currentLevel []*PatternNode) ([]*PatternNode, int) {
+	nextLevel := make([]*PatternNode, 0, 64)
+	hash := xxhash.Checksum32(part)
+	for _, node := range currentLevel {
+		for _, child := range node.Children {
+			match := false
+
+			if child.Hash == asteriskHash || child.Hash == hash {
+				match = true
+			} else if len(child.InnerParts) > 0 {
+				for _, innerPart := range child.InnerParts {
+					innerMatch, _ := path.Match(innerPart, string(part))
+					if innerMatch {
+						match = true
+						break
+					}
+				}
+			}
+
+			if match {
+				nextLevel = append(nextLevel, child)
+			}
+		}
+	}
+	return nextLevel, len(nextLevel)
 }

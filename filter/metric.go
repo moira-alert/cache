@@ -75,7 +75,7 @@ func (t *PatternStorage) ProcessIncomingMetric(lineBytes []byte) *MatchedMetric 
 	atomic.AddInt64(&validReceived, 1)
 
 	matchingStart := time.Now()
-	matched := t.MatchPattern(string(metric))
+	matched := t.MatchPattern(metric)
 	if count%10 == 0 {
 		MatchingTimer.UpdateSince(matchingStart)
 	}
