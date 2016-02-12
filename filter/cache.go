@@ -64,7 +64,6 @@ func (cs *CacheStorage) BuildRetentions(retentionScanner *bufio.Scanner) error {
 // Save buffered save matched metrics
 func (cs *CacheStorage) Save(ch chan *MatchedMetric, save func([]*MatchedMetric)) {
 	buffer := make([]*MatchedMetric, 0, 10)
-	timeout := time.NewTimer(time.Second)
 	for {
 		select {
 		case m, ok := <-ch:
@@ -76,7 +75,7 @@ func (cs *CacheStorage) Save(ch chan *MatchedMetric, save func([]*MatchedMetric)
 				continue
 			}
 			break
-		case <-timeout.C:
+		case <-time.After(time.Second):
 			break
 		}
 		if len(buffer) == 0 {
