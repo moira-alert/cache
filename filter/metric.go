@@ -33,11 +33,11 @@ func (t *PatternStorage) ProcessIncomingMetric(lineBytes []byte) *MatchedMetric 
 	partOffset := 0
 	for i, b := range lineBytes {
 		if !strconv.IsPrint(rune(b)) { // Strip invalid characters from the input
-			if :len(lineBytes) > i { // Dont try and remove rune if at end of bytes
+			if len(lineBytes) > i { // Dont try and remove rune if at end of bytes
 				copy(lineBytes[i:], lineBytes[i + 1:])
 			}
-			lineBytes = lineBytes[:len(lineBytes) - 1]
-		}	
+			lineBytes = lineBytes[:len(lineBytes) - 1]git
+		}
 		if b == ' '{
 			parts[partIndex] = lineBytes[partOffset:i]
 			partOffset = i + 1
