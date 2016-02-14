@@ -36,7 +36,7 @@ func (t *PatternStorage) ProcessIncomingMetric(lineBytes []byte) *MatchedMetric 
 			if len(lineBytes) > i { // Dont try and remove rune if at end of bytes
 				copy(lineBytes[i:], lineBytes[i + 1:])
 			}
-			lineBytes = lineBytes[:len(lineBytes) - 1]git
+			lineBytes = lineBytes[:len(lineBytes) - 1]
 		}
 		if b == ' '{
 			parts[partIndex] = lineBytes[partOffset:i]
