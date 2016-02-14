@@ -53,7 +53,7 @@ var _ = Describe("Cache", func() {
 		"nonprintable.\tmidrune.character 125 1234567890",
 		"nonprintable.at.the.end 123 1234567890\t",
 		"\t",
-		""
+		"",
 	}
 
 	nonMatchingMetrics := []string{
