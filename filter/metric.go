@@ -33,7 +33,9 @@ func (t *PatternStorage) ProcessIncomingMetric(lineBytes []byte) *MatchedMetric 
 	partOffset := 0
 	for i, b := range lineBytes {
 		if !strconv.IsPrint(rune(b)) {
-			copy(lineBytes[i:], lineBytes[i + 1:])
+			if i + 1 < len(lineBytes){
+				copy(lineBytes[i:], lineBytes[i + 1:])
+			}
 			lineBytes = lineBytes[:len(lineBytes) - 1]
 		}
 		if b == ' '{

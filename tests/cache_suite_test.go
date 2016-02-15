@@ -50,6 +50,7 @@ var _ = Describe("Cache", func() {
 		"No.value.no.timestamp",
 		"Too.many.parts 1 2 3 4",
 		"Invalid.value 12g5 1234567890",
+		"\n\t",
 	}
 
 	nonMatchingMetrics := []string{
