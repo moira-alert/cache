@@ -48,7 +48,6 @@ var _ = Describe("Cache", func() {
 
 	invalidRawMetrics := []string{
 		"No.value.no.timestamp",
-		"Too.many.parts 1 2 3 4",
 		"Invalid.value 12g5 1234567890",
 		"\n\t",
 	}
@@ -59,6 +58,7 @@ var _ = Describe("Cache", func() {
 		"Bracket.one.nothing",
 		"Bracket.nothing.pattern",
 		"Complex.prefixonesuffix",
+		"Too.many.parts 1 2 3 4",
 	}
 
 	matchingMetrics := []string{
@@ -178,7 +178,7 @@ var _ = Describe("Cache", func() {
 		Context("When metric name contains non-printable characters", func() {
 			BeforeEach(func() {
 				for _, metric := range matchingMetrics {
-					process("\000" + metric + "\r 12 1234567890")
+					process("\000" + metric + "\r 12 1234567890 \r")
 				}
 			})
 			assertMatchedMetrics(matchingMetrics)
