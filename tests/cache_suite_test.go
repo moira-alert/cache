@@ -178,7 +178,7 @@ var _ = Describe("Cache", func() {
 		Context("When metric name contains non-printable characters", func() {
 			BeforeEach(func() {
 				for _, metric := range matchingMetrics {
-					process("\000" + metric + " 12 1234567890")
+					process("\000" + metric + "\r 12 1234567890")
 				}
 			})
 			assertMatchedMetrics(matchingMetrics)

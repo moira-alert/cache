@@ -33,28 +33,33 @@ func (t *PatternStorage) ProcessIncomingMetric(lineBytes []byte) *MatchedMetric 
 	partOffset := 0
 	for i, b := range lineBytes {
 		if !strconv.IsPrint(rune(b)) {
-			if i + 1 < len(lineBytes){
-				copy(lineBytes[i:], lineBytes[i + 1:])
+			if i+1 < len(lineBytes) {
+				copy(lineBytes[i:], lineBytes[i+1:])
 			}
-			lineBytes = lineBytes[:len(lineBytes) - 1]
+			lineBytes = lineBytes[:len(lineBytes)-1]
+			if i < len(lineBytes) {
+				b = lineBytes[i]
+			}
+
 		}
-		if b == ' '{
+		if b == ' ' {
 			parts[partIndex] = lineBytes[partOffset:i]
 			partOffset = i + 1
-			partIndex ++
+			partIndex++
 		}
 		if partIndex > 2 {
 			return nil
 		}
 	}
-	
-	if partIndex == 0{
+
+	if partIndex == 0 {
 		return nil
 	}
-	
+
 	parts[partIndex] = lineBytes[partOffset:]
 
 	metric := parts[0]
+
 	valueString := string(parts[1])
 
 	value, err := strconv.ParseFloat(valueString, 64)
