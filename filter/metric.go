@@ -7,6 +7,9 @@ import (
 	"time"
 )
 
+// LogParseErrors flag to log parse errors
+var LogParseErrors bool
+
 // MatchedMetric represent parsed and matched metric data
 type MatchedMetric struct {
 	Metric             string
@@ -67,7 +70,9 @@ func (t *PatternStorage) ProcessIncomingMetric(lineBytes []byte) *MatchedMetric 
 
 	value, err := strconv.ParseFloat(valueString, 64)
 	if err != nil {
-		log.Printf("Can not parse value [%s] in line [%s]: %s", valueString, string(lineBytes), err)
+		if LogParseErrors {
+			log.Printf("Can not parse value [%s] in line [%s]: %s", valueString, string(lineBytes), err)
+		}
 		return nil
 	}
 
@@ -77,14 +82,16 @@ func (t *PatternStorage) ProcessIncomingMetric(lineBytes []byte) *MatchedMetric 
 	if partIndex >= 2 {
 		parsed, err := strconv.ParseInt(timestampString, 10, 64)
 		if err != nil || parsed == 0 {
-			log.Printf("Can not parse timestamp [%s] in line [%s]: %s. Use current timestamp", timestampString, string(lineBytes), err)
+			if LogParseErrors {
+				log.Printf("Can not parse timestamp [%s] in line [%s]: %s. Use current timestamp", timestampString, string(lineBytes), err)
+			}
 		} else {
 			timestamp = parsed
 		}
 	}else{
 		timestamp = time.Now().Unix()
 	}
-
+	
 	atomic.AddInt64(&validReceived, 1)
 
 	matchingStart := time.Now()

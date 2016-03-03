@@ -25,6 +25,7 @@ import (
 
 var (
 	configFileName          = flag.String("config", "/etc/moira/config.yml", "path config file")
+	logParseErrors          = flag.Bool("logParseErrors", false, "enable logging metric parse errors")
 	pidFileName             string
 	logFileName             string
 	listen                  string
@@ -44,6 +45,7 @@ func main() {
 
 	flag.Parse()
 	log.SetFlags(log.Lmicroseconds | log.Lshortfile)
+	filter.LogParseErrors = *logParseErrors
 	log.SetPrefix(fmt.Sprintf("pid:%d ", syscall.Getpid()))
 
 	if err := readConfig(configFileName); err != nil {
