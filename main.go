@@ -15,17 +15,18 @@ import (
 	"time"
 
 	"github.com/cyberdelia/go-metrics-graphite"
+	"github.com/garyburd/redigo/redis"
 	"github.com/gosexy/to"
 	"github.com/gosexy/yaml"
 	"github.com/moira-alert/cache/filter"
 	"github.com/rcrowley/go-metrics"
 	"github.com/rcrowley/goagain"
-	"github.com/garyburd/redigo/redis"
 )
 
 var (
 	configFileName          = flag.String("config", "/etc/moira/config.yml", "path config file")
 	logParseErrors          = flag.Bool("logParseErrors", false, "enable logging metric parse errors")
+	printVersion            = flag.Bool("version", false, "Print version and exit")
 	pidFileName             string
 	logFileName             string
 	listen                  string
@@ -37,6 +38,8 @@ var (
 	db                      *filter.DbConnector
 	cache                   *filter.CacheStorage
 	patterns                *filter.PatternStorage
+
+	version = "undefined"
 )
 
 func main() {
@@ -44,6 +47,11 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	flag.Parse()
+  if *printVersion {
+		fmt.Printf("Moira Cache version: %s\n", version)
+		os.Exit(0)
+	}
+
 	log.SetFlags(log.Lmicroseconds | log.Lshortfile)
 	filter.LogParseErrors = *logParseErrors
 	log.SetPrefix(fmt.Sprintf("pid:%d ", syscall.Getpid()))

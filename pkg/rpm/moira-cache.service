@@ -1,0 +1,16 @@
+[Unit]
+Description=moira-cache - metric stream filtering and caching for Moira
+
+[Service]
+ExecStart=/usr/local/bin/moira-cache --config=/etc/moira/config.yml
+User=moira
+Group=moira
+PIDFile=/var/run/moira-cache.pid
+PermissionsStartOnly=true
+ExecStartPre=-/usr/bin/touch /var/run/moira-cache.pid
+ExecStartPre=/usr/bin/chown -R vagrant:vagrant /var/run/moira-cache.pid
+Restart=on-failure
+ExecReload=/bin/kill -USR2 $MAINPID
+
+[Install]
+WantedBy=multi-user.target
