@@ -93,19 +93,21 @@ func main() {
 	}
 
 	l, err := goagain.Listener()
+	var wg sync.WaitGroup
 	if err != nil {
 		l, err = net.Listen("tcp", listen)
 		if err != nil {
 			log.Fatalf("failed to listen on %s: %s", listen, err.Error())
 		}
 		log.Printf("listening on %s", listen)
-
-		go serve(l)
+		wg.Add(1)
+		go serve(l, &wg)
 
 	} else {
 		log.Printf("resuming listening on %s", listen)
 
-		go serve(l)
+		wg.Add(1)
+		go serve(l, &wg)
 
 		if err := goagain.Kill(); err != nil {
 			log.Fatalf("failed to kill parent process: %s", err.Error())
@@ -120,7 +122,7 @@ func main() {
 	if err := l.Close(); err != nil {
 		log.Fatalf("failed to stop listening: %s", err.Error())
 	}
-	time.Sleep(time.Second)
+	wg.Wait()
 	log.Printf("shutdown complete")
 }
 
@@ -140,8 +142,8 @@ func readConfig(configFileName *string) error {
 	return nil
 }
 
-func serve(l net.Listener) {
-	var wg sync.WaitGroup
+func serve(l net.Listener, wg *sync.WaitGroup) {
+	defer wg.Done()
 	ch := make(chan *filter.MatchedMetric, 10)
 	wg.Add(1)
 	go func() {
@@ -158,6 +160,7 @@ func serve(l net.Listener) {
 			time.Sleep(time.Second)
 		}
 	}()
+	var handleWG sync.WaitGroup
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -167,14 +170,17 @@ func serve(l net.Listener) {
 			log.Printf("failed to accept connection: %s", err.Error())
 			continue
 		}
-
-		go handleConnection(conn, ch)
+		handleWG.Add(1)
+		go func(conn net.Conn, ch chan *filter.MatchedMetric){
+			defer handleWG.Done()
+			handleConnection(conn, ch, &handleWG)
+		}(conn, ch)
 	}
+	handleWG.Wait()
 	close(ch)
-	wg.Wait()
 }
 
-func handleConnection(conn net.Conn, ch chan *filter.MatchedMetric) {
+func handleConnection(conn net.Conn, ch chan *filter.MatchedMetric, wg *sync.WaitGroup) {
 	bufconn := bufio.NewReader(conn)
 
 	for {
@@ -186,7 +192,9 @@ func handleConnection(conn net.Conn, ch chan *filter.MatchedMetric) {
 			}
 			break
 		}
+		wg.Add(1)
 		go func(ch chan *filter.MatchedMetric) {
+			defer wg.Done()
 			if m := patterns.ProcessIncomingMetric(lineBytes); m != nil {
 				ch <- m
 			}
