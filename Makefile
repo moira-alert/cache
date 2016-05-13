@@ -10,13 +10,13 @@ build:
 	go build -ldflags "-X main.version=$(VERSION)-$(RELEASE)" -o build/moira-cache
 
 test: prepare
-	ginkgo -r --randomizeAllSpecs --randomizeSuites -cover -coverpkg=../filter --failOnPending --failOnPending --trace --race tests
+	$(GOPATH)/bin/ginkgo -r --randomizeAllSpecs --randomizeSuites -cover -coverpkg=../filter --failOnPending --failOnPending --trace --race tests
 
 .PHONY: test
 
 prepare:
 	go get github.com/sparrc/gdm
-	gdm restore
+	$(GOPATH)/bin/gdm restore
 	go get github.com/onsi/ginkgo/ginkgo
 
 clean:
