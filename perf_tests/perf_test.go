@@ -87,9 +87,9 @@ var _ = Describe("Cache", func() {
 			c.Do("SADD", "moira-pattern-list", string(pattern))
 		}
 		if err != nil && err != io.EOF {
-			fmt.Printf("Error reading patterns: %s", err)
+			fmt.Printf("Error reading patterns: %s", err.Error())
 		}
-		
+
 
 		filter.InitGraphiteMetrics()
 
@@ -121,9 +121,9 @@ func generateMetrics(patterns *filter.PatternStorage, count int) []string{
 	result := make([]string, 0, count)
 
 	timestamp := time.Now()
-	
+
 	i := 0
-	
+
 	for i < count {
 		parts := make([]string, 0, 16)
 
@@ -154,7 +154,7 @@ func generateMetrics(patterns *filter.PatternStorage, count int) []string{
 		i ++
 		timestamp = timestamp.Add(time.Microsecond)
 	}
-	
+
 	return result
 }
 

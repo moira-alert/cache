@@ -71,19 +71,19 @@ func (t *PatternStorage) ProcessIncomingMetric(lineBytes []byte) *MatchedMetric 
 	value, err := strconv.ParseFloat(valueString, 64)
 	if err != nil {
 		if LogParseErrors {
-			log.Printf("Can not parse value [%s] in line [%s]: %s", valueString, string(lineBytes), err)
+			log.Printf("Can not parse value [%s] in line [%s]: %s", valueString, string(lineBytes), err.Error())
 		}
 		return nil
 	}
 
 	var timestamp int64
-	
+
 	timestampString := string(parts[2])
 	if partIndex >= 2 {
 		parsed, err := strconv.ParseInt(timestampString, 10, 64)
 		if err != nil || parsed == 0 {
 			if LogParseErrors {
-				log.Printf("Can not parse timestamp [%s] in line [%s]: %s. Use current timestamp", timestampString, string(lineBytes), err)
+				log.Printf("Can not parse timestamp [%s] in line [%s]: %s. Use current timestamp", timestampString, string(lineBytes), err.Error())
 			}
 		} else {
 			timestamp = parsed
@@ -91,7 +91,7 @@ func (t *PatternStorage) ProcessIncomingMetric(lineBytes []byte) *MatchedMetric 
 	}else{
 		timestamp = time.Now().Unix()
 	}
-	
+
 	atomic.AddInt64(&validReceived, 1)
 
 	matchingStart := time.Now()

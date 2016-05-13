@@ -57,23 +57,23 @@ func main() {
 	log.SetPrefix(fmt.Sprintf("pid:%d ", syscall.Getpid()))
 
 	if err := readConfig(configFileName); err != nil {
-		log.Fatalf("error reading config %s: %s", *configFileName, err)
+		log.Fatalf("error reading config [%s]: %s", *configFileName, err.Error())
 	}
 	logFile, err := os.OpenFile(logFileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
-		log.Fatalf("error opening log file %s: %s", logFileName, err)
+		log.Fatalf("error opening log file [%s]: %s", logFileName, err.Error())
 	}
 	defer logFile.Close()
 	log.SetOutput(logFile)
 
 	err = ioutil.WriteFile(pidFileName, []byte(fmt.Sprint(syscall.Getpid())), 0644)
 	if err != nil {
-		log.Fatalf("error writing pid file %s: %s", pidFileName, err)
+		log.Fatalf("error writing pid file [%s]: %s", pidFileName, err.Error())
 	}
 
 	retentionConfigFile, err := os.Open(retentionConfigFileName)
 	if err != nil {
-		log.Fatalf("error open retentions file %s: %s", pidFileName, err)
+		log.Fatalf("error open retentions file [%s]: %s", pidFileName, err.Error())
 	}
 
 	filter.InitGraphiteMetrics()
@@ -82,7 +82,7 @@ func main() {
 	patterns = filter.NewPatternStorage()
 	cache, err = filter.NewCacheStorage(retentionConfigFile)
 	if err != nil {
-		log.Fatalf("failed to initialize cache with config %s: %s", retentionConfigFileName, err.Error())
+		log.Fatalf("failed to initialize cache with config [%s]: %s", retentionConfigFileName, err.Error())
 	}
 
 	go patterns.Refresh(db)
@@ -97,7 +97,7 @@ func main() {
 	if err != nil {
 		l, err = net.Listen("tcp", listen)
 		if err != nil {
-			log.Fatalf("failed to listen on %s: %s", listen, err.Error())
+			log.Fatalf("failed to listen on [%s]: %s", listen, err.Error())
 		}
 		log.Printf("listening on %s", listen)
 		wg.Add(1)
@@ -129,7 +129,7 @@ func main() {
 func readConfig(configFileName *string) error {
 	file, err := yaml.Open(*configFileName)
 	if err != nil {
-		return fmt.Errorf("Can't read config file %s: %s", *configFileName, err.Error())
+		return fmt.Errorf("Can't read config file [%s]: %s", *configFileName, err.Error())
 	}
 	pidFileName = to.String(file.Get("cache", "pid"))
 	logFileName = to.String(file.Get("cache", "log_file"))
@@ -150,7 +150,7 @@ func serve(l net.Listener, wg *sync.WaitGroup) {
 		defer wg.Done()
 		cache.Save(ch, func(buffer []*filter.MatchedMetric) {
 			if err := cache.SavePoints(buffer, db); err != nil {
-				log.Printf("failed to save value in cache: %s", err)
+				log.Printf("failed to save value in cache: %s", err.Error())
 			}
 		})
 	}()
@@ -188,7 +188,7 @@ func handleConnection(conn net.Conn, ch chan *filter.MatchedMetric, wg *sync.Wai
 		if err != nil {
 			conn.Close()
 			if err != io.EOF {
-				log.Printf("read failed: %s", err)
+				log.Printf("read failed: %s", err.Error())
 			}
 			break
 		}
