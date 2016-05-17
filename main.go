@@ -47,7 +47,7 @@ func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	flag.Parse()
-  if *printVersion {
+	if *printVersion {
 		fmt.Printf("Moira Cache version: %s\n", version)
 		os.Exit(0)
 	}
@@ -171,7 +171,7 @@ func serve(l net.Listener, wg *sync.WaitGroup) {
 			continue
 		}
 		handleWG.Add(1)
-		go func(conn net.Conn, ch chan *filter.MatchedMetric){
+		go func(conn net.Conn, ch chan *filter.MatchedMetric) {
 			defer handleWG.Done()
 			handleConnection(conn, ch, &handleWG)
 		}(conn, ch)

@@ -15,7 +15,7 @@ type DbConnector struct {
 // NewDbConnector return db connector
 func NewDbConnector(pool *redis.Pool) *DbConnector {
 	return &DbConnector{
-		Pool: pool,
+		Pool:  pool,
 		cache: make(map[string]*MatchedMetric),
 	}
 }
@@ -34,6 +34,13 @@ func (connector *DbConnector) getPatterns() ([]string, error) {
 	c := connector.Pool.Get()
 	defer c.Close()
 	return redis.Strings(c.Do("SMEMBERS", "moira-pattern-list"))
+}
+
+func (connector *DbConnector) selfStateSave(tc int64) error {
+	c := connector.Pool.Get()
+	defer c.Close()
+	err := c.Send("SET", "moira-selfstate:last-metric-received-ts", fmt.Sprintf("%v", tc), "EX", fmt.Sprintf("%v", 60))
+	return err
 }
 
 func (connector *DbConnector) saveMetrics(buffer []*MatchedMetric) error {

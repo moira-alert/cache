@@ -39,10 +39,10 @@ func (t *PatternStorage) ProcessIncomingMetric(lineBytes []byte) *MatchedMetric 
 			if i+1 < len(lineBytes) {
 				copy(lineBytes[i:], lineBytes[i+1:])
 			}
-			lineBytes = lineBytes[:len(lineBytes) - 1]
+			lineBytes = lineBytes[:len(lineBytes)-1]
 			if i < len(lineBytes) {
 				b = lineBytes[i]
-			}else{
+			} else {
 				break
 			}
 		}
@@ -76,7 +76,8 @@ func (t *PatternStorage) ProcessIncomingMetric(lineBytes []byte) *MatchedMetric 
 		return nil
 	}
 
-	var timestamp int64
+	timestamp := time.Now().Unix()
+	t.lastMetricReceivedTS = timestamp
 
 	timestampString := string(parts[2])
 	if partIndex >= 2 {
@@ -88,8 +89,6 @@ func (t *PatternStorage) ProcessIncomingMetric(lineBytes []byte) *MatchedMetric 
 		} else {
 			timestamp = parsed
 		}
-	}else{
-		timestamp = time.Now().Unix()
 	}
 
 	atomic.AddInt64(&validReceived, 1)

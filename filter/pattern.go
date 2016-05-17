@@ -14,7 +14,8 @@ var asteriskHash = xxhash.Checksum32([]byte("*"))
 
 // PatternStorage contains pattern tree
 type PatternStorage struct {
-	PatternTree *PatternNode
+	PatternTree          *PatternNode
+	lastMetricReceivedTS int64
 }
 
 type PatternNode struct {
@@ -27,7 +28,9 @@ type PatternNode struct {
 
 // NewPatternStorage creates new PatternStorage struct
 func NewPatternStorage() *PatternStorage {
-	return &PatternStorage{}
+	return &PatternStorage{
+		lastMetricReceivedTS: time.Now().Unix(),
+	}
 }
 
 // DoRefresh builds pattern tree from redis data
@@ -49,6 +52,11 @@ func (t *PatternStorage) Refresh(db *DbConnector) {
 			log.Printf("pattern refresh failed: %s", err.Error())
 		}
 		BuildTreeTimer.UpdateSince(timer)
+
+		err = db.selfStateSave(t.lastMetricReceivedTS)
+		if err != nil {
+			log.Printf("save state failed: %s", err.Error())
+		}
 
 		time.Sleep(time.Second)
 	}
