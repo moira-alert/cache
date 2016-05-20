@@ -2,7 +2,7 @@ package filter
 
 import (
 	"fmt"
-
+	"time"
 	"github.com/garyburd/redigo/redis"
 )
 
@@ -71,4 +71,26 @@ func (connector *DbConnector) saveMetrics(buffer []*MatchedMetric) error {
 		}
 	}
 	return c.Flush()
+}
+
+// NewRedisPool return redis.Pool from host:port URI
+func NewRedisPool(redisURI string, dbID ...int) *redis.Pool {
+	return &redis.Pool{
+		MaxIdle:     10,
+		IdleTimeout: 240 * time.Second,
+		Dial: func() (redis.Conn, error) {
+			c, err := redis.Dial("tcp", redisURI)
+			if err != nil {
+				return nil, err
+			}
+			if len(dbID) > 0 {
+				c.Do("SELECT", dbID[0])
+			}
+			return c, err
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			return err
+		},
+	}
 }
