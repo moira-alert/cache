@@ -87,9 +87,13 @@ func main() {
 	terminate := make(chan bool)
 
 	var wg sync.WaitGroup
+	
 	wg.Add(1)
 	go patterns.Refresh(db, terminate, &wg)
 
+	wg.Add(1)
+	go heartbeat(db, terminate, &wg)
+	
 	if graphiteURI != "" {
 		graphiteAddr, _ := net.ResolveTCPAddr("tcp", graphiteURI)
 		go graphite.Graphite(metrics.DefaultRegistry, time.Duration(graphiteInterval)*time.Second, fmt.Sprintf("%s.cache", graphitePrefix), graphiteAddr)
@@ -103,13 +107,13 @@ func main() {
 		}
 		log.Printf("listening on %s", listen)
 		wg.Add(1)
-		go serve(l, &wg, terminate)
+		go serve(l, terminate, &wg)
 
 	} else {
 		log.Printf("resuming listening on %s", listen)
 
 		wg.Add(1)
-		go serve(l, &wg, terminate)
+		go serve(l, terminate, &wg)
 
 		if err := goagain.Kill(); err != nil {
 			log.Fatalf("failed to kill parent process: %s", err.Error())
@@ -144,7 +148,7 @@ func readConfig(configFileName *string) error {
 	return nil
 }
 
-func serve(l net.Listener, wg *sync.WaitGroup, terminate chan bool) {
+func serve(l net.Listener, terminate chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
 	metricsChan := make(chan *filter.MatchedMetric, 10)
 	wg.Add(1)

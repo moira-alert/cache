@@ -77,7 +77,6 @@ func (t *PatternStorage) ProcessIncomingMetric(lineBytes []byte) *MatchedMetric 
 	}
 
 	timestamp := time.Now().Unix()
-	t.lastMetricReceivedTS = timestamp
 
 	timestampString := string(parts[2])
 	if partIndex >= 2 {
