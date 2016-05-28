@@ -18,6 +18,7 @@ type PatternStorage struct {
 	lastMetricReceivedTS int64
 }
 
+// PatternNode contains pattern node
 type PatternNode struct {
 	Children   []*PatternNode
 	Part       string
@@ -86,7 +87,7 @@ func (t *PatternStorage) buildTree(patterns []string) error {
 					newNode.Prefix = fmt.Sprintf("%s.%s", currentNode.Prefix, part)
 				}
 
-				if part == "*" || !strings.ContainsAny(part, "{*") {
+				if part == "*" || !strings.ContainsAny(part, "{*?") {
 					newNode.Hash = xxhash.Checksum32([]byte(part))
 				} else {
 					if strings.Contains(part, "{") && strings.Contains(part, "}") {

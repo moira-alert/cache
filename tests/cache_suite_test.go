@@ -44,6 +44,8 @@ var _ = Describe("Cache", func() {
 		"Complex.matching.pattern",
 		"Complex.*.*",
 		"Complex.*{one,two,three}suf*.pattern",
+		"Question.?at_begin",
+		"Question.at_the_end?",
 	}
 
 	invalidRawMetrics := []string{
@@ -76,6 +78,8 @@ var _ = Describe("Cache", func() {
 		"Complex.prefixonesuffix.pattern",
 		"Complex.prefixtwofix.pattern",
 		"Complex.anything.pattern",
+		"Question.1at_begin",
+		"Question.at_the_end2",
 	}
 
 	testRetentions := `
