@@ -5,6 +5,7 @@ import (
 	"log"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vova616/xxhash"
@@ -18,6 +19,7 @@ type PatternStorage struct {
 	lastMetricReceivedTS int64
 }
 
+// PatternNode contains pattern node
 type PatternNode struct {
 	Children   []*PatternNode
 	Part       string
@@ -44,21 +46,25 @@ func (t *PatternStorage) DoRefresh(db *DbConnector) error {
 }
 
 // Refresh run infinite refresh of patterns tree
-func (t *PatternStorage) Refresh(db *DbConnector) {
+func (t *PatternStorage) Refresh(db *DbConnector, terminate chan bool, wg *sync.WaitGroup) {
+	defer wg.Done()
 	for {
-		timer := time.Now()
-		err := t.DoRefresh(db)
-		if err != nil {
-			log.Printf("pattern refresh failed: %s", err.Error())
-		}
-		BuildTreeTimer.UpdateSince(timer)
+		select {
+		case <-terminate:
+			return
+		case <-time.After(time.Second):
+			timer := time.Now()
+			err := t.DoRefresh(db)
+			if err != nil {
+				log.Printf("pattern refresh failed: %s", err.Error())
+			}
+			BuildTreeTimer.UpdateSince(timer)
 
-		err = db.selfStateSave(t.lastMetricReceivedTS)
-		if err != nil {
-			log.Printf("save state failed: %s", err.Error())
+			err = db.selfStateSave(t.lastMetricReceivedTS)
+			if err != nil {
+				log.Printf("save state failed: %s", err.Error())
+			}
 		}
-
-		time.Sleep(time.Second)
 	}
 }
 
