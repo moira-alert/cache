@@ -26,12 +26,13 @@ tar:
 	mkdir -p build/root/usr/local/bin
 	mkdir -p build/root/usr/lib/systemd/system
 	mkdir -p build/root/etc/logrotate.d
-	mkdir -p build/root/etc/moira/cache
+	mkdir -p build/root/etc/moira
 
 	mv build/moira-cache build/root/usr/local/bin/
 	cp pkg/moira-cache.service build/root/usr/lib/systemd/system/moira-cache.service
 	cp pkg/logrotate build/root/etc/logrotate.d/moira-cache
-	cp pkg/storage-schemas.conf build/root/etc/logrotate.d/moira-cache
+	cp pkg/storage-schemas.conf build/root/etc/moira/storage-schemas.conf
+	cp pkg/cache.yml build/root/etc/moira/cache.yml
 
 	tar -czvPf build/moira-cache-$(VERSION)-$(RELEASE).tar.gz -C build/root  .
 
@@ -46,6 +47,8 @@ rpm:
 		--version "$(VERSION)" \
 		--iteration "$(RELEASE)" \
 		--after-install "./pkg/postinst" \
+		--config-files "/etc/moira/storage-schemas.conf" \
+		--config-files "/etc/moira/cache.yml" \
 		--depends logrotate \
 		-p build \
 		build/moira-cache-$(VERSION)-$(RELEASE).tar.gz
@@ -61,6 +64,8 @@ deb:
 		--version "$(VERSION)" \
 		--iteration "$(RELEASE)" \
 		--after-install "./pkg/postinst" \
+		--config-files "/etc/moira/storage-schemas.conf" \
+		--config-files "/etc/moira/cache.yml" \
 		--depends logrotate \
 		-p build \
 		build/moira-cache-$(VERSION)-$(RELEASE).tar.gz
