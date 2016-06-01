@@ -79,6 +79,9 @@ func main() {
 
 	db = filter.NewDbConnector(filter.NewRedisPool(redisURI))
 	patterns = filter.NewPatternStorage()
+	if err = patterns.DoRefresh(db); err != nil {
+		log.Fatalf("failed to refresh pattern storage: %s", err.Error())
+	}
 	cache, err = filter.NewCacheStorage(retentionConfigFile)
 	if err != nil {
 		log.Fatalf("failed to initialize cache with config [%s]: %s", retentionConfigFileName, err.Error())
