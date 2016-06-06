@@ -30,17 +30,18 @@ func GetMetricRetentionDbKey(metric string) string {
 	return fmt.Sprintf("moira-metric-retention:%s", metric)
 }
 
+// UpdateMetricsHeartbeat increments redis counter
+func (connector *DbConnector) UpdateMetricsHeartbeat() error {
+	c := connector.Pool.Get()
+	defer c.Close()
+	err := c.Send("INCR", "moira-selfstate:metrics-heartbeat")
+	return err
+}
+
 func (connector *DbConnector) getPatterns() ([]string, error) {
 	c := connector.Pool.Get()
 	defer c.Close()
 	return redis.Strings(c.Do("SMEMBERS", "moira-pattern-list"))
-}
-
-func (connector *DbConnector) selfStateSave(tc int64) error {
-	c := connector.Pool.Get()
-	defer c.Close()
-	err := c.Send("SET", "moira-selfstate:last-metric-received-ts", fmt.Sprintf("%v", tc), "EX", fmt.Sprintf("%v", 60))
-	return err
 }
 
 func (connector *DbConnector) saveMetrics(buffer []*MatchedMetric) error {

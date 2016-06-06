@@ -5,6 +5,7 @@ import (
 	"log"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vova616/xxhash"
@@ -15,7 +16,6 @@ var asteriskHash = xxhash.Checksum32([]byte("*"))
 // PatternStorage contains pattern tree
 type PatternStorage struct {
 	PatternTree          *PatternNode
-	lastMetricReceivedTS int64
 }
 
 // PatternNode contains pattern node
@@ -29,9 +29,7 @@ type PatternNode struct {
 
 // NewPatternStorage creates new PatternStorage struct
 func NewPatternStorage() *PatternStorage {
-	return &PatternStorage{
-		lastMetricReceivedTS: time.Now().Unix(),
-	}
+	return &PatternStorage{}
 }
 
 // DoRefresh builds pattern tree from redis data
@@ -45,21 +43,20 @@ func (t *PatternStorage) DoRefresh(db *DbConnector) error {
 }
 
 // Refresh run infinite refresh of patterns tree
-func (t *PatternStorage) Refresh(db *DbConnector) {
+func (t *PatternStorage) Refresh(db *DbConnector, terminate chan bool, wg *sync.WaitGroup) {
+	defer wg.Done()
 	for {
-		timer := time.Now()
-		err := t.DoRefresh(db)
-		if err != nil {
-			log.Printf("pattern refresh failed: %s", err.Error())
+		select {
+		case <-terminate:
+			return
+		case <-time.After(time.Second):
+			timer := time.Now()
+			err := t.DoRefresh(db)
+			if err != nil {
+				log.Printf("pattern refresh failed: %s", err.Error())
+			}
+			BuildTreeTimer.UpdateSince(timer)
 		}
-		BuildTreeTimer.UpdateSince(timer)
-
-		err = db.selfStateSave(t.lastMetricReceivedTS)
-		if err != nil {
-			log.Printf("save state failed: %s", err.Error())
-		}
-
-		time.Sleep(time.Second)
 	}
 }
 

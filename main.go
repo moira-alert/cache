@@ -79,20 +79,30 @@ func main() {
 
 	db = filter.NewDbConnector(filter.NewRedisPool(redisURI))
 	patterns = filter.NewPatternStorage()
+	if err = patterns.DoRefresh(db); err != nil {
+		log.Fatalf("failed to refresh pattern storage: %s", err.Error())
+	}
 	cache, err = filter.NewCacheStorage(retentionConfigFile)
 	if err != nil {
 		log.Fatalf("failed to initialize cache with config [%s]: %s", retentionConfigFileName, err.Error())
 	}
 
-	go patterns.Refresh(db)
+	terminate := make(chan bool)
 
+	var wg sync.WaitGroup
+	
+	wg.Add(1)
+	go patterns.Refresh(db, terminate, &wg)
+
+	wg.Add(1)
+	go heartbeat(db, terminate, &wg)
+	
 	if graphiteURI != "" {
 		graphiteAddr, _ := net.ResolveTCPAddr("tcp", graphiteURI)
 		go graphite.Graphite(metrics.DefaultRegistry, time.Duration(graphiteInterval)*time.Second, fmt.Sprintf("%s.cache", graphitePrefix), graphiteAddr)
 	}
 
 	l, err := goagain.Listener()
-	var wg sync.WaitGroup
 	if err != nil {
 		l, err = net.Listen("tcp", listen)
 		if err != nil {
@@ -100,13 +110,13 @@ func main() {
 		}
 		log.Printf("listening on %s", listen)
 		wg.Add(1)
-		go serve(l, &wg)
+		go serve(l, terminate, &wg)
 
 	} else {
 		log.Printf("resuming listening on %s", listen)
 
 		wg.Add(1)
-		go serve(l, &wg)
+		go serve(l, terminate, &wg)
 
 		if err := goagain.Kill(); err != nil {
 			log.Fatalf("failed to kill parent process: %s", err.Error())
@@ -141,13 +151,13 @@ func readConfig(configFileName *string) error {
 	return nil
 }
 
-func serve(l net.Listener, wg *sync.WaitGroup) {
+func serve(l net.Listener, terminate chan bool, wg *sync.WaitGroup) {
 	defer wg.Done()
-	ch := make(chan *filter.MatchedMetric, 10)
+	metricsChan := make(chan *filter.MatchedMetric, 10)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		cache.Save(ch, func(buffer []*filter.MatchedMetric) {
+		cache.Save(metricsChan, func(buffer []*filter.MatchedMetric) {
 			if err := cache.SavePoints(buffer, db); err != nil {
 				log.Printf("failed to save value in cache: %s", err.Error())
 			}
@@ -155,8 +165,12 @@ func serve(l net.Listener, wg *sync.WaitGroup) {
 	}()
 	go func() {
 		for {
-			filter.UpdateProcessingMetrics()
-			time.Sleep(time.Second)
+			select {
+			case <-terminate:
+				return
+			case <-time.After(time.Second):
+				filter.UpdateProcessingMetrics()
+			}
 		}
 	}()
 	var handleWG sync.WaitGroup
@@ -164,6 +178,8 @@ func serve(l net.Listener, wg *sync.WaitGroup) {
 		conn, err := l.Accept()
 		if err != nil {
 			if goagain.IsErrClosing(err) {
+				log.Println("Listener closed")
+				close(terminate)
 				break
 			}
 			log.Printf("failed to accept connection: %s", err.Error())
@@ -172,15 +188,20 @@ func serve(l net.Listener, wg *sync.WaitGroup) {
 		handleWG.Add(1)
 		go func(conn net.Conn, ch chan *filter.MatchedMetric) {
 			defer handleWG.Done()
-			handleConnection(conn, ch, &handleWG)
-		}(conn, ch)
+			handleConnection(conn, ch, terminate, &handleWG)
+		}(conn, metricsChan)
 	}
 	handleWG.Wait()
-	close(ch)
+	close(metricsChan)
 }
 
-func handleConnection(conn net.Conn, ch chan *filter.MatchedMetric, wg *sync.WaitGroup) {
+func handleConnection(conn net.Conn, ch chan *filter.MatchedMetric, terminate chan bool, wg *sync.WaitGroup) {
 	bufconn := bufio.NewReader(conn)
+
+	go func(conn net.Conn){
+		<- terminate
+		conn.Close()
+	}(conn)
 
 	for {
 		lineBytes, err := bufconn.ReadBytes('\n')
