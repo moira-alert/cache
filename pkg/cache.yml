@@ -11,4 +11,4 @@ cache:
   log_file: /var/log/cache/cache.log
   listen: ':2003'
   retention-config: /etc/moira/storage-schemas.conf
-  pid: /var/run/moira-cache.pid
+  pid: /var/run/moira/moira-cache.pid

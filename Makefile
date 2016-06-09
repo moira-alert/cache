@@ -27,12 +27,14 @@ tar:
 	mkdir -p build/root/usr/lib/systemd/system
 	mkdir -p build/root/etc/logrotate.d
 	mkdir -p build/root/etc/moira
+	mkdir -p build/root/usr/lib/tmpfiles.d
 
 	mv build/moira-cache build/root/usr/local/bin/
 	cp pkg/moira-cache.service build/root/usr/lib/systemd/system/moira-cache.service
 	cp pkg/logrotate build/root/etc/logrotate.d/moira-cache
 	cp pkg/storage-schemas.conf build/root/etc/moira/storage-schemas.conf
 	cp pkg/cache.yml build/root/etc/moira/cache.yml
+	cp pkg/tmpfiles build/root/usr/lib/tmpfiles.d/moira.conf
 
 	tar -czvPf build/moira-cache-$(VERSION)-$(RELEASE).tar.gz -C build/root  .
 

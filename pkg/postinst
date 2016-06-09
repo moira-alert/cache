@@ -13,8 +13,8 @@ set -e
       -c "Moira user" moira
   fi
 
-  mkdir -p /var/log/moira/cache
-  chown -R moira:moira /var/log/moira/cache
+  mkdir -p /var/log/moira/cache /var/run/moira
+  chown -R moira:moira /var/log/moira/cache /var/run/moira
   chmod 755 /var/log/moira/cache
 
   if [ -x /bin/systemctl ] ; then
