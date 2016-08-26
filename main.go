@@ -82,7 +82,7 @@ func main() {
 	if err = patterns.DoRefresh(db); err != nil {
 		log.Fatalf("failed to refresh pattern storage: %s", err.Error())
 	}
-	cache, err = filter.NewCacheStorage(retentionConfigFile)
+	cache, err = filter.NewCacheStorage(bufio.NewScanner(retentionConfigFile))
 	if err != nil {
 		log.Fatalf("failed to initialize cache with config [%s]: %s", retentionConfigFileName, err.Error())
 	}
@@ -90,13 +90,13 @@ func main() {
 	terminate := make(chan bool)
 
 	var wg sync.WaitGroup
-	
+
 	wg.Add(1)
 	go patterns.Refresh(db, terminate, &wg)
 
 	wg.Add(1)
 	go heartbeat(db, terminate, &wg)
-	
+
 	if graphiteURI != "" {
 		graphiteAddr, _ := net.ResolveTCPAddr("tcp", graphiteURI)
 		go graphite.Graphite(metrics.DefaultRegistry, time.Duration(graphiteInterval)*time.Second, fmt.Sprintf("%s.cache", graphitePrefix), graphiteAddr)
@@ -157,7 +157,7 @@ func serve(l net.Listener, terminate chan bool, wg *sync.WaitGroup) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		cache.Save(metricsChan, func(buffer []*filter.MatchedMetric) {
+		cache.ProcessMatchedMetrics(metricsChan, func(buffer []*filter.MatchedMetric) {
 			if err := cache.SavePoints(buffer, db); err != nil {
 				log.Printf("failed to save value in cache: %s", err.Error())
 			}
@@ -198,8 +198,8 @@ func serve(l net.Listener, terminate chan bool, wg *sync.WaitGroup) {
 func handleConnection(conn net.Conn, ch chan *filter.MatchedMetric, terminate chan bool, wg *sync.WaitGroup) {
 	bufconn := bufio.NewReader(conn)
 
-	go func(conn net.Conn){
-		<- terminate
+	go func(conn net.Conn) {
+		<-terminate
 		conn.Close()
 	}(conn)
 
