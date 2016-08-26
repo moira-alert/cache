@@ -263,10 +263,8 @@ func assertMatchedMetrics(matchingMetrics []string) {
 
 func process(metric string) {
 	if m := patterns.ProcessIncomingMetric([]byte(metric)); m != nil {
-		buffer := make([]*filter.MatchedMetric, 0, 1)
-		if cache.ProcessMatchedMetric(m){
-			buffer = append(buffer, m)
-		}
+		buffer := make(map[string]*filter.MatchedMetric)
+		cache.EnrichMatchedMetric(buffer, m)
 		cache.SavePoints(buffer, db)
 	}
 }

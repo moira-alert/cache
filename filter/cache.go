@@ -66,8 +66,8 @@ func (cs *CacheStorage) buildRetentions(retentionScanner *bufio.Scanner) error {
 }
 
 // ProcessMatchedMetrics make buffer of metrics and save it
-func (cs *CacheStorage) ProcessMatchedMetrics(ch chan *MatchedMetric, save func([]*MatchedMetric)) {
-	buffer := make([]*MatchedMetric, 0, 10)
+func (cs *CacheStorage) ProcessMatchedMetrics(ch chan *MatchedMetric, save func(map[string]*MatchedMetric)) {
+	buffer := make(map[string]*MatchedMetric)
 	for {
 		select {
 		case m, ok := <-ch:
@@ -75,9 +75,7 @@ func (cs *CacheStorage) ProcessMatchedMetrics(ch chan *MatchedMetric, save func(
 				return
 			}
 
-			if cs.ProcessMatchedMetric(m) {
-				buffer = append(buffer, m)
-			}
+			cs.EnrichMatchedMetric(buffer, m)
 
 			if len(buffer) < 10 {
 				continue
@@ -92,25 +90,23 @@ func (cs *CacheStorage) ProcessMatchedMetrics(ch chan *MatchedMetric, save func(
 		timer := time.Now()
 		save(buffer)
 		SavingTimer.UpdateSince(timer)
-		buffer = make([]*MatchedMetric, 0, 10)
+		buffer = make(map[string]*MatchedMetric)
 	}
 }
 
-// ProcessMatchedMetric calculate retention and filter cached values
-func (cs *CacheStorage) ProcessMatchedMetric(m *MatchedMetric) bool {
+// EnrichMatchedMetric calculate retention and filter cached values
+func (cs *CacheStorage) EnrichMatchedMetric(buffer map[string]*MatchedMetric, m *MatchedMetric) {
 	m.Retention = cs.GetRetention(m)
 	m.RetentionTimestamp = roundToNearestRetention(m.Timestamp, int64(m.Retention))
-
 	if ex, ok := cs.metricsCache[m.Metric]; ok && ex.RetentionTimestamp == m.RetentionTimestamp && ex.Value == m.Value {
-		return false
+		return
 	}
 	cs.metricsCache[m.Metric] = m
-
-	return true
+	buffer[m.Metric] = m
 }
 
 // SavePoints saving matched metrics to DB
-func (cs *CacheStorage) SavePoints(buffer []*MatchedMetric, db *DbConnector) error {
+func (cs *CacheStorage) SavePoints(buffer map[string]*MatchedMetric, db *DbConnector) error {
 
 	if err := db.saveMetrics(buffer); err != nil {
 		return err

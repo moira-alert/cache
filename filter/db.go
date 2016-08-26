@@ -42,7 +42,7 @@ func (connector *DbConnector) getPatterns() ([]string, error) {
 	return redis.Strings(c.Do("SMEMBERS", "moira-pattern-list"))
 }
 
-func (connector *DbConnector) saveMetrics(buffer []*MatchedMetric) error {
+func (connector *DbConnector) saveMetrics(buffer map[string]*MatchedMetric) error {
 
 	c := connector.Pool.Get()
 	defer c.Close()
