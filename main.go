@@ -157,7 +157,7 @@ func serve(l net.Listener, terminate chan bool, wg *sync.WaitGroup) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		cache.ProcessMatchedMetrics(metricsChan, func(buffer []*filter.MatchedMetric) {
+		cache.ProcessMatchedMetrics(metricsChan, func(buffer map[string]*filter.MatchedMetric) {
 			if err := cache.SavePoints(buffer, db); err != nil {
 				log.Printf("failed to save value in cache: %s", err.Error())
 			}
