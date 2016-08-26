@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"fmt"
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/gmlexx/redigomock"
@@ -130,8 +131,11 @@ var _ = Describe("Cache", func() {
 
 		patterns = filter.NewPatternStorage()
 		patterns.DoRefresh(db)
-		cache = &filter.CacheStorage{}
-		cache.BuildRetentions(bufio.NewScanner(strings.NewReader(testRetentions)))
+		var err error
+		cache, err = filter.NewCacheStorage(bufio.NewScanner(strings.NewReader(testRetentions)))
+		if err != nil {
+			Fail(fmt.Sprintf("Can not create new cache storage %s", err))
+		}
 	})
 
 	Context("When invalid metric arrives", func() {
@@ -259,7 +263,8 @@ func assertMatchedMetrics(matchingMetrics []string) {
 
 func process(metric string) {
 	if m := patterns.ProcessIncomingMetric([]byte(metric)); m != nil {
-		buffer := []*filter.MatchedMetric{m}
+		buffer := make(map[string]*filter.MatchedMetric)
+		cache.EnrichMatchedMetric(buffer, m)
 		cache.SavePoints(buffer, db)
 	}
 }

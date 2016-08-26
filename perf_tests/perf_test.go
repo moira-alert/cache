@@ -95,8 +95,10 @@ var _ = Describe("Cache", func() {
 
 		patterns = filter.NewPatternStorage()
 		patterns.DoRefresh(db)
-		cache = &filter.CacheStorage{}
-		cache.BuildRetentions(bufio.NewScanner(strings.NewReader(testRetentions)))
+		cache, err = filter.NewCacheStorage(bufio.NewScanner(strings.NewReader(testRetentions)))
+		if err != nil {
+			Fail(fmt.Sprintf("Can not create new cache storage %s", err))
+		}
 
 		testMetricsLines = generateMetrics(patterns, 100000)
 	})

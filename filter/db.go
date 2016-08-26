@@ -9,14 +9,12 @@ import (
 // DbConnector is DB layer client
 type DbConnector struct {
 	Pool  *redis.Pool
-	cache map[string]*MatchedMetric
 }
 
 // NewDbConnector return db connector
 func NewDbConnector(pool *redis.Pool) *DbConnector {
 	return &DbConnector{
 		Pool:  pool,
-		cache: make(map[string]*MatchedMetric),
 	}
 }
 
@@ -44,17 +42,13 @@ func (connector *DbConnector) getPatterns() ([]string, error) {
 	return redis.Strings(c.Do("SMEMBERS", "moira-pattern-list"))
 }
 
-func (connector *DbConnector) saveMetrics(buffer []*MatchedMetric) error {
+func (connector *DbConnector) saveMetrics(buffer map[string]*MatchedMetric) error {
 
 	c := connector.Pool.Get()
 	defer c.Close()
 
 	for _, m := range buffer {
 
-		if ex, ok := connector.cache[m.Metric]; ok && ex.RetentionTimestamp == m.RetentionTimestamp && ex.Value == m.Value {
-			continue
-		}
-		connector.cache[m.Metric] = m
 		metricKey := GetMetricDbKey(m.Metric)
 		metricRetentionKey := GetMetricRetentionDbKey(m.Metric)
 

@@ -2,7 +2,6 @@ package filter
 
 import (
 	"bufio"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -15,23 +14,28 @@ type retentionMatcher struct {
 	retention int
 }
 
+// CacheStorage struct to store retention matchers
 type CacheStorage struct {
-	retentions []retentionMatcher
+	retentions      []retentionMatcher
+	retentionsCache map[string]*retentionCacheItem
+	metricsCache    map[string]*MatchedMetric
 }
 
 // NewCacheStorage create new CacheStorage
-func NewCacheStorage(retentionConfigFile *os.File) (*CacheStorage, error) {
+func NewCacheStorage(retentionScanner *bufio.Scanner) (*CacheStorage, error) {
 
-	storage := &CacheStorage{}
-	if err := storage.BuildRetentions(bufio.NewScanner(retentionConfigFile)); err != nil {
+	storage := &CacheStorage{
+		retentionsCache: make(map[string]*retentionCacheItem),
+		metricsCache:    make(map[string]*MatchedMetric),
+	}
+	if err := storage.buildRetentions(retentionScanner); err != nil {
 		return nil, err
 	}
 
 	return storage, nil
 }
 
-// BuildRetentions build cache storage retention matchers
-func (cs *CacheStorage) BuildRetentions(retentionScanner *bufio.Scanner) error {
+func (cs *CacheStorage) buildRetentions(retentionScanner *bufio.Scanner) error {
 	cs.retentions = make([]retentionMatcher, 0, 100)
 
 	for retentionScanner.Scan() {
@@ -61,16 +65,18 @@ func (cs *CacheStorage) BuildRetentions(retentionScanner *bufio.Scanner) error {
 	return retentionScanner.Err()
 }
 
-// Save buffered save matched metrics
-func (cs *CacheStorage) Save(ch chan *MatchedMetric, save func([]*MatchedMetric)) {
-	buffer := make([]*MatchedMetric, 0, 10)
+// ProcessMatchedMetrics make buffer of metrics and save it
+func (cs *CacheStorage) ProcessMatchedMetrics(ch chan *MatchedMetric, save func(map[string]*MatchedMetric)) {
+	buffer := make(map[string]*MatchedMetric)
 	for {
 		select {
 		case m, ok := <-ch:
 			if !ok {
 				return
 			}
-			buffer = append(buffer, m)
+
+			cs.EnrichMatchedMetric(buffer, m)
+
 			if len(buffer) < 10 {
 				continue
 			}
@@ -84,23 +90,23 @@ func (cs *CacheStorage) Save(ch chan *MatchedMetric, save func([]*MatchedMetric)
 		timer := time.Now()
 		save(buffer)
 		SavingTimer.UpdateSince(timer)
-		buffer = make([]*MatchedMetric, 0, 10)
+		buffer = make(map[string]*MatchedMetric)
 	}
 }
 
-// SavePoints saving matched metrics to DB
-func (cs *CacheStorage) SavePoints(buffer []*MatchedMetric, db *DbConnector) error {
-
-	for _, m := range buffer {
-		for _, matcher := range cs.retentions {
-			if matcher.pattern.MatchString(m.Metric) {
-				m.Retention = matcher.retention
-				break
-			}
-		}
-		m.RetentionTimestamp = roundToNearestRetention(m.Timestamp, int64(m.Retention))
-
+// EnrichMatchedMetric calculate retention and filter cached values
+func (cs *CacheStorage) EnrichMatchedMetric(buffer map[string]*MatchedMetric, m *MatchedMetric) {
+	m.Retention = cs.GetRetention(m)
+	m.RetentionTimestamp = roundToNearestRetention(m.Timestamp, int64(m.Retention))
+	if ex, ok := cs.metricsCache[m.Metric]; ok && ex.RetentionTimestamp == m.RetentionTimestamp && ex.Value == m.Value {
+		return
 	}
+	cs.metricsCache[m.Metric] = m
+	buffer[m.Metric] = m
+}
+
+// SavePoints saving matched metrics to DB
+func (cs *CacheStorage) SavePoints(buffer map[string]*MatchedMetric, db *DbConnector) error {
 
 	if err := db.saveMetrics(buffer); err != nil {
 		return err
