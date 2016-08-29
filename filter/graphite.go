@@ -6,11 +6,17 @@ import (
 )
 
 var (
+	// TotalMetricsReceived metrics counter
 	TotalMetricsReceived    metrics.Meter
+	// ValidMetricsReceived metrics counter
 	ValidMetricsReceived    metrics.Meter
+	// MatchingMetricsReceived metrics counter
 	MatchingMetricsReceived metrics.Meter
+	// MatchingTimer metrics timer
 	MatchingTimer           metrics.Timer
+	// SavingTimer metrics timer
 	SavingTimer             metrics.Timer
+	// BuildTreeTimer metrics timer
 	BuildTreeTimer          metrics.Timer
 )
 
