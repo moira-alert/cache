@@ -34,6 +34,7 @@ var (
 	graphitePrefix          string
 	graphiteInterval        int64
 	retentionConfigFileName string
+	dbID					int
 	db                      *filter.DbConnector
 	cache                   *filter.CacheStorage
 	patterns                *filter.PatternStorage
@@ -77,7 +78,7 @@ func main() {
 
 	filter.InitGraphiteMetrics()
 
-	db = filter.NewDbConnector(filter.NewRedisPool(redisURI))
+	db = filter.NewDbConnector(filter.NewRedisPool(redisURI, dbID))
 	patterns = filter.NewPatternStorage()
 	if err = patterns.DoRefresh(db); err != nil {
 		log.Fatalf("failed to refresh pattern storage: %s", err.Error())
@@ -148,6 +149,7 @@ func readConfig(configFileName *string) error {
 	graphiteURI = to.String(file.Get("graphite", "uri"))
 	graphitePrefix = to.String(file.Get("graphite", "prefix"))
 	graphiteInterval = to.Int64(file.Get("graphite", "interval"))
+	dbID = int(to.Int64(file.Get("redis", "dbid")))
 	return nil
 }
 
