@@ -52,7 +52,7 @@ func (connector *DbConnector) saveMetrics(buffer map[string]*MatchedMetric) erro
 		metricKey := GetMetricDbKey(m.Metric)
 		metricRetentionKey := GetMetricRetentionDbKey(m.Metric)
 
-		metricValue := fmt.Sprintf("%v %v", m.RetentionTimestamp, m.Value)
+		metricValue := fmt.Sprintf("%v %v", m.Timestamp, m.Value)
 
 		c.Send("ZADD", metricKey, m.RetentionTimestamp, metricValue)
 		c.Send("SET", metricRetentionKey, m.Retention)
