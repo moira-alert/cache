@@ -45,12 +45,6 @@
 			"tree": true
 		},
 		{
-			"checksumSHA1": "Licl470LKGzu4APl201kzYu81tw=",
-			"path": "github.com/rcrowley/go-metrics",
-			"revision": "51425a2415d21afadfd55cd93432c0bc69e9598d",
-			"tree": true
-		},
-		{
 			"checksumSHA1": "oXDLp3Up9ilbqyi5LUkJa5ta8x0=",
 			"path": "github.com/rcrowley/goagain",
 			"revision": "f2f192b5d1a96e21dd4026ce67cda85e49659a48",
@@ -63,22 +57,10 @@
 			"tree": true
 		},
 		{
-			"checksumSHA1": "MGk7cSnHqiL5soaovzgcJaNH3fc=",
-			"path": "gopkg.in/yaml.v1",
-			"revision": "9f9df34309c04878acc86042b16630b0f696e1de",
-			"tree": true
-		},
-		{
-			"checksumSHA1": "sJLzTVHd/ywf6RAme1aKe5VSy3M=",
-			"path": "menteslibres.net/gosexy/dig",
-			"revision": "8c84038322702f6214cc1403a74c33c86ad65f9a",
-			"tree": true
-		},
-		{
-			"checksumSHA1": "NHNmSR5DggsQ15Ms7tlbgTOjHo8=",
-			"path": "menteslibres.net/gosexy/to",
-			"revision": "c20e083e31230b84ffa23c5d2fb0bc55f5292681",
-			"tree": true
+			"checksumSHA1": "Ww6wiSKdA8LwxoJz4DNUF+crH4g=",
+			"path": "gopkg.in/yaml.v2",
+			"revision": "f7716cbe52baa25d2e9b0d0da546fcf909fc16b4",
+			"revisionTime": "2015-12-01T16:27:45Z"
 		}
 	],
 	"rootPath": "github.com/moira-alert/cache"
