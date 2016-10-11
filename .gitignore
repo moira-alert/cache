@@ -4,3 +4,4 @@ cache
 build/
 gover.coverprofile
 tests/tests.coverprofile
+vendor/*/

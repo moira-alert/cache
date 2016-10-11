@@ -15,8 +15,8 @@ test: prepare
 .PHONY: test
 
 prepare:
-	go get github.com/sparrc/gdm
-	$(GOPATH)/bin/gdm restore
+	go get github.com/kardianos/govendor
+	$(GOPATH)/bin/govendor sync
 	go get github.com/onsi/ginkgo/ginkgo
 
 clean:
