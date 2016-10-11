@@ -10,13 +10,13 @@ build:
 	go build -ldflags "-X main.version=$(VERSION)-$(RELEASE)" -o build/moira-cache
 
 test: prepare
-	$(GOPATH)/bin/ginkgo -r --randomizeAllSpecs --randomizeSuites -cover -coverpkg=../filter --failOnPending --failOnPending --trace --race tests
+	ginkgo -r --randomizeAllSpecs --randomizeSuites -cover -coverpkg=github.com/moira-alert/cache/filter --failOnPending --trace --race tests
 
 .PHONY: test
 
 prepare:
 	go get github.com/kardianos/govendor
-	$(GOPATH)/bin/govendor sync
+	govendor sync
 	go get github.com/onsi/ginkgo/ginkgo
 
 clean:
