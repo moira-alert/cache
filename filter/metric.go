@@ -1,10 +1,12 @@
 package filter
 
 import (
+	"fmt"
 	"log"
 	"strconv"
 	"sync/atomic"
 	"time"
+	"unicode"
 )
 
 // LogParseErrors flag to log parse errors
@@ -26,68 +28,63 @@ var (
 	matchedReceived int64
 )
 
-// ProcessIncomingMetric process "metric value [timestamp]" raw line
-func (t *PatternStorage) ProcessIncomingMetric(lineBytes []byte) *MatchedMetric {
-
-	count := atomic.AddInt64(&totalReceived, 1)
-
+// ParseMetricFromString parses metric from string
+func ParseMetricFromString(line []byte) ([]byte, float64, int64, error) {
 	var parts [3][]byte
 	partIndex := 0
 	partOffset := 0
-	for i, b := range lineBytes {
-		if !strconv.IsPrint(rune(b)) {
-			if i+1 < len(lineBytes) {
-				copy(lineBytes[i:], lineBytes[i+1:])
-			}
-			lineBytes = lineBytes[:len(lineBytes)-1]
-			if i < len(lineBytes) {
-				b = lineBytes[i]
-			} else {
-				break
-			}
+	for i, b := range line {
+		r := rune(b)
+		if r > unicode.MaxASCII || !strconv.IsPrint(r) {
+			return nil, 0, 0, fmt.Errorf("non-ascii or non-printable chars in metric name: '%s'", line)
 		}
 		if b == ' ' {
-			parts[partIndex] = lineBytes[partOffset:i]
+			parts[partIndex] = line[partOffset:i]
 			partOffset = i + 1
 			partIndex++
 		}
 		if partIndex > 2 {
-			break
+			return nil, 0, 0, fmt.Errorf("too many space-separated items: '%s'", line)
 		}
 	}
 
-	if partIndex == 0 {
-		return nil
+	if partIndex < 2 {
+		return nil, 0, 0, fmt.Errorf("too few space-separated items: '%s'", line)
 	}
 
-	if partIndex <= 2 {
-		parts[partIndex] = lineBytes[partOffset:]
-	}
+	parts[partIndex] = line[partOffset:]
 
 	metric := parts[0]
-
-	valueString := string(parts[1])
-
-	value, err := strconv.ParseFloat(valueString, 64)
-	if err != nil {
-		if LogParseErrors {
-			log.Printf("Can not parse value [%s] in line [%s]: %s", valueString, string(lineBytes), err.Error())
-		}
-		return nil
+	if len(metric) < 1 {
+		return nil, 0, 0, fmt.Errorf("metric name is empty: '%s'", line)
 	}
 
-	timestamp := time.Now().Unix()
+	valueString := string(parts[1])
+	value, err := strconv.ParseFloat(valueString, 64)
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("cannot parse value: '%s' (%s)", line, err)
+	}
 
 	timestampString := string(parts[2])
-	if partIndex >= 2 {
-		parsed, err := strconv.ParseInt(timestampString, 10, 64)
-		if err != nil || parsed == 0 {
-			if LogParseErrors {
-				log.Printf("Can not parse timestamp [%s] in line [%s]: %s. Use current timestamp", timestampString, string(lineBytes), err.Error())
-			}
-		} else {
-			timestamp = parsed
+	timestamp, err := strconv.ParseInt(timestampString, 10, 64)
+	if err != nil || timestamp == 0 {
+		return nil, 0, 0, fmt.Errorf("cannot parse timestamp: '%s' (%s)", line, err)
+	}
+
+	return metric, value, timestamp, nil
+}
+
+// ProcessIncomingMetric process "metric value timestamp" raw line
+func (t *PatternStorage) ProcessIncomingMetric(lineBytes []byte) *MatchedMetric {
+	count := atomic.AddInt64(&totalReceived, 1)
+
+	metric, value, timestamp, err := ParseMetricFromString(lineBytes)
+	if err != nil {
+		if LogParseErrors {
+			log.Printf("cannot parse input: %s", err)
 		}
+
+		return nil
 	}
 
 	atomic.AddInt64(&validReceived, 1)

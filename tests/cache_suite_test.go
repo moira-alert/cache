@@ -3,11 +3,11 @@ package tests
 import (
 	"bufio"
 	"flag"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
 	"time"
-	"fmt"
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/gmlexx/redigomock"
@@ -35,7 +35,64 @@ func TestCache(t *testing.T) {
 	}
 }
 
-var _ = Describe("Cache", func() {
+var _ = Describe("Cache unit tests", func() {
+	Describe("ParseMetricFromString", func() {
+		Context("Given invalid metric strings", func() {
+			invalidMetrics := []string{
+				"Invalid.value 12g5 1234567890",
+				"No.value.two.spaces  1234567890",
+				"No.timestamp.space.in.the.end 123 ",
+				"No.timestamp 123",
+				" 123 1234567890",
+				"Non-ascii.こんにちは 12 1234567890",
+				"Non-printable.\000 12 1234567890",
+				"",
+				"\n",
+				"Too.many.parts 1 2 3 4 12 1234567890",
+				"Space.in.the.end 12 1234567890 ",
+				" Space.in.the.beginning 12 1234567890",
+				"\tNon-printable.in.the.beginning 12 1234567890",
+				"\rNon-printable.in.the.beginning 12 1234567890",
+			}
+
+			It("should return errors", func() {
+				for _, invalidMetric := range invalidMetrics {
+					_, _, _, err := filter.ParseMetricFromString([]byte(invalidMetric))
+					Expect(err).To(HaveOccurred(), "failed metric: '%s'", invalidMetric)
+				}
+			})
+		})
+
+		Context("Given valid metric strings", func() {
+			type m struct {
+				raw       string
+				metric    string
+				value     float64
+				timestamp int64
+			}
+			validMetrics := []m{
+				m{"One.two.three 123 1234567890", "One.two.three", 123, 1234567890},
+				m{"One.two.three 1.23e2 1234567890", "One.two.three", 123, 1234567890},
+				m{"One.two.three -123 1234567890", "One.two.three", -123, 1234567890},
+				m{"One.two.three +123 1234567890", "One.two.three", 123, 1234567890},
+				m{"One.two.three 123. 1234567890", "One.two.three", 123, 1234567890},
+				m{"One.two.three 123.0 1234567890", "One.two.three", 123, 1234567890},
+				m{"One.two.three .123 1234567890", "One.two.three", 0.123, 1234567890},
+			}
+			It("should return parsed values", func() {
+				for _, validMetric := range validMetrics {
+					metric, value, timestamp, err := filter.ParseMetricFromString([]byte(validMetric.raw))
+					Expect(err).NotTo(HaveOccurred(), "failed metric: '%s'", validMetric)
+					Expect(metric).To(Equal([]byte(validMetric.metric)), "failed metric: '%s'", validMetric)
+					Expect(value).To(Equal(validMetric.value), "failed metric: '%s'", validMetric)
+					Expect(timestamp).To(Equal(validMetric.timestamp), "failed metric: '%s'", validMetric)
+				}
+			})
+		})
+	})
+})
+
+var _ = Describe("Cache functional tests", func() {
 	testPatterns := []string{
 		"Simple.matching.pattern",
 		"Star.single.*",
@@ -49,19 +106,12 @@ var _ = Describe("Cache", func() {
 		"Question.at_the_end?",
 	}
 
-	invalidRawMetrics := []string{
-		"No.value.no.timestamp",
-		"Invalid.value 12g5 1234567890",
-		"\n\t",
-	}
-
 	nonMatchingMetrics := []string{
 		"Simple.notmatching.pattern",
 		"Star.nothing",
 		"Bracket.one.nothing",
 		"Bracket.nothing.pattern",
 		"Complex.prefixonesuffix",
-		"Too.many.parts 1 2 3 4",
 	}
 
 	matchingMetrics := []string{
@@ -117,12 +167,12 @@ var _ = Describe("Cache", func() {
 	BeforeEach(func() {
 		c := redigomock.NewFakeRedis()
 		db = filter.NewDbConnector(&redis.Pool{
-				MaxIdle:     3,
-				IdleTimeout: 240 * time.Second,
-				Dial: func() (redis.Conn, error) {
-					return c, nil
-				},
-			})
+			MaxIdle:     3,
+			IdleTimeout: 240 * time.Second,
+			Dial: func() (redis.Conn, error) {
+				return c, nil
+			},
+		})
 		for _, pattern := range testPatterns {
 			c.Do("SADD", "moira-pattern-list", pattern)
 		}
@@ -140,30 +190,18 @@ var _ = Describe("Cache", func() {
 
 	Context("When invalid metric arrives", func() {
 		BeforeEach(func() {
-			for _, metric := range invalidRawMetrics {
-				process(metric)
-			}
+			process("Invalid.metric")
 		})
 
 		It("should be properly counted", func() {
 			filter.UpdateProcessingMetrics()
-			Expect(int(filter.TotalMetricsReceived.Count())).To(Equal(len(invalidRawMetrics)))
+			Expect(int(filter.TotalMetricsReceived.Count())).To(Equal(1))
 			Expect(int(filter.ValidMetricsReceived.Count())).To(Equal(0))
 			Expect(int(filter.MatchingMetricsReceived.Count())).To(Equal(0))
 		})
 	})
 
 	Context("When valid non-matching metric arrives", func() {
-
-		Context("When metric arrives without timestamp", func() {
-			BeforeEach(func() {
-				for _, metric := range nonMatchingMetrics {
-					process(metric + " 12")
-				}
-			})
-			assertNonMatchedMetrics(nonMatchingMetrics)
-		})
-
 		Context("When metric arrives with timestamp", func() {
 			BeforeEach(func() {
 				for _, metric := range nonMatchingMetrics {
@@ -179,14 +217,6 @@ var _ = Describe("Cache", func() {
 			BeforeEach(func() {
 				for _, metric := range matchingMetrics {
 					process(metric + " 12 1234567890")
-				}
-			})
-			assertMatchedMetrics(matchingMetrics)
-		})
-		Context("When metric name contains non-printable characters", func() {
-			BeforeEach(func() {
-				for _, metric := range matchingMetrics {
-					process("\000" + metric + "\r 12 1234567890 \r")
 				}
 			})
 			assertMatchedMetrics(matchingMetrics)
