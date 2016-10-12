@@ -63,10 +63,22 @@
 			"tree": true
 		},
 		{
+			"checksumSHA1": "EN0uJ9QjGGt0K1ZdiXnTvzkRWAc=",
+			"path": "gopkg.in/yaml.v1",
+			"revision": "9f9df34309c04878acc86042b16630b0f696e1de",
+			"revisionTime": "2014-09-24T16:16:07Z"
+		},
+		{
 			"checksumSHA1": "Ww6wiSKdA8LwxoJz4DNUF+crH4g=",
 			"path": "gopkg.in/yaml.v2",
 			"revision": "f7716cbe52baa25d2e9b0d0da546fcf909fc16b4",
 			"revisionTime": "2015-12-01T16:27:45Z"
+		},
+		{
+			"checksumSHA1": "7w9dKxaQf8mwoX6rQiiNcETEVkU=",
+			"path": "menteslibres.net/gosexy/dig",
+			"revision": "8c84038322702f6214cc1403a74c33c86ad65f9a",
+			"revisionTime": "2013-08-07T00:53:56Z"
 		}
 	],
 	"rootPath": "github.com/moira-alert/cache"
