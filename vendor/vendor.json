@@ -79,6 +79,12 @@
 			"path": "menteslibres.net/gosexy/dig",
 			"revision": "8c84038322702f6214cc1403a74c33c86ad65f9a",
 			"revisionTime": "2013-08-07T00:53:56Z"
+		},
+		{
+			"checksumSHA1": "NHNmSR5DggsQ15Ms7tlbgTOjHo8=",
+			"path": "menteslibres.net/gosexy/to",
+			"revision": "c20e083e31230b84ffa23c5d2fb0bc55f5292681",
+			"revisionTime": "2014-12-21T20:36:44Z"
 		}
 	],
 	"rootPath": "github.com/moira-alert/cache"
