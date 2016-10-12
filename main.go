@@ -34,7 +34,7 @@ var (
 	graphitePrefix          string
 	graphiteInterval        int64
 	retentionConfigFileName string
-	dbID					int
+	dbID                    int
 	db                      *filter.DbConnector
 	cache                   *filter.CacheStorage
 	patterns                *filter.PatternStorage
@@ -207,6 +207,7 @@ func handleConnection(conn net.Conn, ch chan *filter.MatchedMetric, terminate ch
 
 	for {
 		lineBytes, err := bufconn.ReadBytes('\n')
+		lineBytes = lineBytes[:len(lineBytes)-1]
 		if err != nil {
 			conn.Close()
 			if err != io.EOF {
