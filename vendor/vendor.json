@@ -45,6 +45,12 @@
 			"tree": true
 		},
 		{
+			"checksumSHA1": "M5Aq6RxcikOpiU42rHfb+6o3p4c=",
+			"path": "github.com/rcrowley/go-metrics",
+			"revision": "51425a2415d21afadfd55cd93432c0bc69e9598d",
+			"revisionTime": "2016-01-13T23:50:30Z"
+		},
+		{
 			"checksumSHA1": "oXDLp3Up9ilbqyi5LUkJa5ta8x0=",
 			"path": "github.com/rcrowley/goagain",
 			"revision": "f2f192b5d1a96e21dd4026ce67cda85e49659a48",
