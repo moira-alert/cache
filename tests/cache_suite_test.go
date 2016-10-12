@@ -247,8 +247,8 @@ func assertMatchedMetrics(matchingMetrics []string) {
 		for _, metric := range matchingMetrics {
 			dbKey := filter.GetMetricDbKey(metric)
 			count, err := redis.Int(c.Do("ZCOUNT", dbKey, "-inf", "+inf"))
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(count).To(Equal(1))
+			Expect(err).ShouldNot(HaveOccurred(), "failed metric: '%s'", metric)
+			Expect(count).To(Equal(1), "failed metric: '%s'", metric)
 		}
 	})
 
@@ -265,8 +265,8 @@ func assertMatchedMetrics(matchingMetrics []string) {
 			}
 			dbKey := filter.GetMetricRetentionDbKey(metric)
 			result, err := redis.Int(c.Do("GET", dbKey))
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(result).To(Equal(retention))
+			Expect(err).ShouldNot(HaveOccurred(), "failed metric: '%s'", metric)
+			Expect(result).To(Equal(retention), "failed metric: '%s'", metric)
 		}
 	})
 
@@ -283,9 +283,9 @@ func assertMatchedMetrics(matchingMetrics []string) {
 			}
 			dbKey := filter.GetMetricDbKey(metric)
 			values, err := redis.Strings(c.Do("ZRANGE", dbKey, 0, -1, "WITHSCORES"))
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(len(values)).To(Equal(2))
-			Expect(values[1]).To(Equal(timestamp))
+			Expect(err).ShouldNot(HaveOccurred(), "failed metric: '%s'", metric)
+			Expect(len(values)).To(Equal(2), "failed metric: '%s'", metric)
+			Expect(values[1]).To(Equal(timestamp), "failed metric: '%s'", metric)
 		}
 	})
 
@@ -315,12 +315,12 @@ func assertNonMatchedMetrics(nonMatchingMetrics []string) {
 		for _, metric := range nonMatchingMetrics {
 			metricDbKey := filter.GetMetricDbKey(metric)
 			count, err := redis.Int(c.Do("ZCOUNT", metricDbKey, "-inf", "+inf"))
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(count).To(Equal(0))
+			Expect(err).ShouldNot(HaveOccurred(), "failed metric: '%s'", metric)
+			Expect(count).To(Equal(0), "failed metric: '%s'", metric)
 			retentionDbKey := filter.GetMetricRetentionDbKey(metric)
 			result, err := c.Do("GET", retentionDbKey)
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(result).To(BeNil())
+			Expect(err).ShouldNot(HaveOccurred(), "failed metric: '%s'", metric)
+			Expect(result).To(BeNil(), "failed metric: '%s'", metric)
 		}
 	})
 
