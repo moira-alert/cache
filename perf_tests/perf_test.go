@@ -5,11 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"strings"
 	"testing"
 	"time"
-	"math/rand"
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/gmlexx/redigomock"
@@ -80,8 +80,8 @@ var _ = Describe("Cache", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 		patternsReader := bufio.NewReader(patternsTxt)
 		for {
-			pattern, _, err := patternsReader.ReadLine()
-			if err != nil {
+			pattern, _, err1 := patternsReader.ReadLine()
+			if err1 != nil {
 				break
 			}
 			c.Do("SADD", "moira-pattern-list", string(pattern))
@@ -89,7 +89,6 @@ var _ = Describe("Cache", func() {
 		if err != nil && err != io.EOF {
 			fmt.Printf("Error reading patterns: %s", err.Error())
 		}
-
 
 		filter.InitGraphiteMetrics()
 
@@ -111,14 +110,14 @@ var _ = Describe("Cache", func() {
 				}
 			})
 			Expect(runtime.Seconds()).Should(BeNumerically("<", 1), "metrics processing shouldn't take too long.")
-			b.RecordValue("metrics per sec", float64(len(testMetricsLines)) / runtime.Seconds())
+			b.RecordValue("metrics per sec", float64(len(testMetricsLines))/runtime.Seconds())
 			filter.UpdateProcessingMetrics()
 			b.RecordValue("matched", float64(filter.MatchingMetricsReceived.Count()))
 		}, 10)
 	})
 })
 
-func generateMetrics(patterns *filter.PatternStorage, count int) []string{
+func generateMetrics(patterns *filter.PatternStorage, count int) []string {
 
 	result := make([]string, 0, count)
 
@@ -137,7 +136,7 @@ func generateMetrics(patterns *filter.PatternStorage, count int) []string{
 			if len(node.InnerParts) > 0 {
 				part = node.InnerParts[rand.Intn(len(node.InnerParts))]
 			}
-			if !matched && rand.Float64() < 0.2 + level {
+			if !matched && rand.Float64() < 0.2+level {
 				part = RandStringBytes(len(part))
 			}
 			parts = append(parts, strings.Replace(part, "*", "XXXXXXXXX", -1))
@@ -153,7 +152,7 @@ func generateMetrics(patterns *filter.PatternStorage, count int) []string{
 		path := strings.Join(parts, ".")
 		metric := strings.Join([]string{path, v, ts}, " ")
 		result = append(result, metric)
-		i ++
+		i++
 		timestamp = timestamp.Add(time.Microsecond)
 	}
 
@@ -163,9 +162,9 @@ func generateMetrics(patterns *filter.PatternStorage, count int) []string{
 const letterBytes = "abcdefghijklmnopqrstuvwxyz"
 
 func RandStringBytes(n int) string {
-    b := make([]byte, n)
-    for i := range b {
-        b[i] = letterBytes[rand.Intn(len(letterBytes))]
-    }
-    return string(b)
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
 }
