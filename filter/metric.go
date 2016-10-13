@@ -29,6 +29,7 @@ var (
 )
 
 // ParseMetricFromString parses metric from string
+// supported format: "<metricString> <valueFloat64> <timestampInt64>"
 func ParseMetricFromString(line []byte) ([]byte, float64, int64, error) {
 	var parts [3][]byte
 	partIndex := 0
@@ -59,14 +60,12 @@ func ParseMetricFromString(line []byte) ([]byte, float64, int64, error) {
 		return nil, 0, 0, fmt.Errorf("metric name is empty: '%s'", line)
 	}
 
-	valueString := string(parts[1])
-	value, err := strconv.ParseFloat(valueString, 64)
+	value, err := strconv.ParseFloat(string(parts[1]), 64)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("cannot parse value: '%s' (%s)", line, err)
 	}
 
-	timestampString := string(parts[2])
-	timestamp, err := strconv.ParseInt(timestampString, 10, 64)
+	timestamp, err := strconv.ParseInt(string(parts[2]), 10, 64)
 	if err != nil || timestamp == 0 {
 		return nil, 0, 0, fmt.Errorf("cannot parse timestamp: '%s' (%s)", line, err)
 	}
@@ -74,7 +73,7 @@ func ParseMetricFromString(line []byte) ([]byte, float64, int64, error) {
 	return metric, value, timestamp, nil
 }
 
-// ProcessIncomingMetric process "metric value timestamp" raw line
+// ProcessIncomingMetric validates, parses and matches incoming raw string
 func (t *PatternStorage) ProcessIncomingMetric(lineBytes []byte) *MatchedMetric {
 	count := atomic.AddInt64(&totalReceived, 1)
 

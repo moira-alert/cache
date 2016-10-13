@@ -41,9 +41,9 @@ var _ = Describe("Cache unit tests", func() {
 			invalidMetrics := []string{
 				"Invalid.value 12g5 1234567890",
 				"No.value.two.spaces  1234567890",
-				"No.timestamp.space.in.the.end 123 ",
-				"No.timestamp 123",
-				" 123 1234567890",
+				"No.timestamp.space.in.the.end 12 ",
+				"No.timestamp 12",
+				" 12 1234567890",
 				"Non-ascii.こんにちは 12 1234567890",
 				"Non-printable.\000 12 1234567890",
 				"",
@@ -54,6 +54,8 @@ var _ = Describe("Cache unit tests", func() {
 				"\tNon-printable.in.the.beginning 12 1234567890",
 				"\rNon-printable.in.the.beginning 12 1234567890",
 				"Newline.in.the.end 12 1234567890\n",
+				"Newline.in.the.end 12 1234567890\r",
+				"Newline.in.the.end 12 1234567890\r\n",
 			}
 
 			It("should return errors", func() {
