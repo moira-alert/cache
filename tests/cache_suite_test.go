@@ -53,6 +53,7 @@ var _ = Describe("Cache unit tests", func() {
 				" Space.in.the.beginning 12 1234567890",
 				"\tNon-printable.in.the.beginning 12 1234567890",
 				"\rNon-printable.in.the.beginning 12 1234567890",
+				"Newline.in.the.end 12 1234567890\n",
 			}
 
 			It("should return errors", func() {
