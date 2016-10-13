@@ -207,14 +207,14 @@ func handleConnection(conn net.Conn, ch chan *filter.MatchedMetric, terminate ch
 
 	for {
 		lineBytes, err := bufconn.ReadBytes('\n')
-		lineBytes = lineBytes[:len(lineBytes)-1]
 		if err != nil {
 			conn.Close()
 			if err != io.EOF {
-				log.Printf("read failed: %s", err.Error())
+				log.Printf("read failed: %s", err)
 			}
 			break
 		}
+		lineBytes = lineBytes[:len(lineBytes)-1]
 		wg.Add(1)
 		go func(ch chan *filter.MatchedMetric) {
 			defer wg.Done()
